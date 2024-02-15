@@ -16,6 +16,8 @@ import time
 from collections import defaultdict
 from random import randint
 
+from files import FileManager
+
 
 
 
@@ -47,10 +49,32 @@ class ElementFrequencyCounter:
         return merged_counter
 
 
+class SequenceManager:
+    def __init__(self):
+        self.next_number = 0
+        self.sequences = {}
+        
+
+    def registerSequence(self, sequence: tuple):
+        """
+        Assign a number to each new sequence and store it in the sequences dictionary.
+        """
+        seq_num = self.sequences.get(sequence, None)
+        if seq_num:
+            return seq_num
+        else:
+            self.sequences[sequence] = self.next_number
+            self.next_number += 1
+            return self.next_number - 1
+        
+
 class SequencesProcessor:
-    def __init__(self, ANIMAL_FILE_FORMAT, LANGUAGE):
+    def __init__(self, FILES, ANIMAL_FILE_FORMAT, LANGUAGE):
+        self.FILES = FILES
         self.COLUMNS = ANIMAL_FILE_FORMAT
         self.LANGUAGE = LANGUAGE
+        # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
+        self.sequence_sets = [[set() for _ in np.arange(7)] for _ in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
 
     def getMatrix(self, file):
         """Takes a text file and returns a numpy matrix"""
@@ -78,6 +102,82 @@ class SequencesProcessor:
         by_contingency = np.split(mat, np.where(np.diff(mat[:, self.COLUMNS['CONTINGENCY_COL']]))[0] + 1)
         # Return an array of tuples: each tuple contains the sub-matrix with the contingency column removed, as well as the contingency value.
         return [(np.delete(submat, self.COLUMNS['CONTINGENCY_COL'], 1), submat[0, self.COLUMNS['CONTINGENCY_COL']]) for submat in by_contingency]
+
+    def getSequences(self, mat, length):
+        """
+        Given a matrix and a length, returns a set of all the sequences of that length.
+        Straddles sessions if STRADDLE_SESSIONS is True, otherwise only considers sequences within the same session.
+        This gets run num_contingencies * MAX_SEQUENCE_LENGTH times per animal.
+        """
+        sequences = set()
+        if not self.LANGUAGE['STRADDLE_SESSIONS']:
+            i = 0
+            while i <= len(mat) - length:
+                last_idx_of_sequence = i + length - 1
+                if mat[i, self.COLUMNS['SESSION_NO_COL']] == mat[last_idx_of_sequence, self.COLUMNS['SESSION_NO_COL']]:
+                    # If the first and last session numbers of this sequence are the same, add it to the set of sequences
+                    sequences.add(tuple(mat[i:i+length, self.COLUMNS['CHOICE_COL']]))
+                    i += 1
+                else:
+                    # Otherwise, we're straddling sessions, so we need to skip to the second session present in the relevant section
+                    # Even if there's a session caught in the middle, skipping to second session will just trigger this case again, so it will handle itself
+                    relevant_section = mat[i:last_idx_of_sequence+1, self.COLUMNS['SESSION_NO_COL']]
+                    i += np.where(relevant_section != relevant_section[0])[0][0]
+        else:
+            for i in np.arange(len(mat) - length):
+                sequences.add(tuple(mat[i:i+length, self.COLUMNS['CHOICE_COL']]))
+        return sequences
+
+
+    def getAllLengthSequences(self, mats: list[tuple[np.array, int]]):
+        """
+        Takes a list of tuples, each containing a matrix and a contingency number.
+        Get all sequences of length up to MAX_SEQUENCE_LENGTH for each contingency.
+        This gets run once per animal.
+        """
+        for mat, cont in mats:
+            # print("PROCESSING CONTINGENCY", cont)
+            for length in np.arange(1, self.LANGUAGE['MAX_SEQUENCE_LENGTH'] + 1):
+                sequences = self.getSequences(mat, length)
+                self.sequence_sets[length-1][cont].update(sequences)
+                #print(f"Contingency {cont}, Length {length}, Num Sequences: {len(sequences)}")
+        
+
+    
+
+    def generateSequenceFiles(self):
+        """
+        MAIN FUNCTION FOR THIS MODULE
+        """
+        all_paths = FileManager.unpickle_obj(os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
+        for animal in all_paths:
+            mat = self.getMatrix(animal)
+            mat = self.collapseModifiers(mat)
+            mats_by_cont = self.splitContingency(mat)
+            self.getAllLengthSequences(mats_by_cont)
+        sequence_counts = [[len(self.sequence_sets[i][j]) for j in np.arange(7)] for i in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        print(np.array(sequence_counts))
+
+
+
+    
+# Generate 1000000 sequences of length 6 and see if registerSequence or registerSequence2 is faster
+# sequences = [tuple(np.random.randint(1, 10, 6)) for _ in np.arange(1000000)]
+# start = time.time()
+# sequenceManager = SequenceManager()
+# for sequence in sequences:
+#     sequenceManager.registerSequence(sequence)
+# print(f"Time for registerSequence: {time.time() - start}")
+# start = time.time()
+# sequenceManager = SequenceManager()
+# for sequence in sequences:
+#     sequenceManager.registerSequence2(sequence)
+# print(f"Time for registerSequence2: {time.time() - start}")
+
+
+
+
+
 
 # def getSequences(mat, length):
 #     """

@@ -2,6 +2,8 @@ import os
 import re
 import numpy as np
 import time
+import pickle
+from sys import getsizeof
 
 
 
@@ -36,7 +38,12 @@ class FileManager:
 
     def getMatrix(file):
         """Takes a text file and returns a numpy matrix"""
-        return np.genfromtxt(file, delimiter=',', dtype=int)
+        # Force it to be 2D even if there's only one row
+        return np.atleast_2d(np.genfromtxt(file, delimiter=',', dtype=int))
+    
+    def writeMatrix(file, mat):
+        """Writes a numpy matrix to a text file"""
+        np.savetxt(file, mat, delimiter=',', fmt='%d')
 
     def buildAnimalInfo(self, cohort_dict):
         """
@@ -45,17 +52,41 @@ class FileManager:
             animal number, cohort number, <all info in the info file>
         """
         animal_num = 0
+        all_paths = []
         with open(self.FILES['ANIMALS_FILE'], 'a') as f:
             for cohort_name, cohort_num in cohort_dict.items():
                 cohort_folder = os.path.join(self.FILES['DATA'], cohort_name)
                 info_file = os.path.join(cohort_folder, self.FILES['INFO_FILE'])
-                animal_files = FileManager.natural_sort([name for name in os.listdir(cohort_folder) if os.path.isfile(os.path.join(cohort_folder, name)) and name != self.FILES['INFO_FILE']])
+                animal_files = FileManager.natural_sort([name for name in os.listdir(cohort_folder) if os.path.isfile(os.path.join(cohort_folder, name)) 
+                                                         and name != self.FILES['INFO_FILE'] 
+                                                         and not name.startswith('.')])
+                all_paths += [os.path.join(cohort_folder, file) for file in animal_files]
                 animal_info_matrix = FileManager.getMatrix(info_file)
+                # Get rid of hidden files
+                animal_files = [file for file in animal_files if not file.startswith('.')]
                 assert len(animal_files) == len(animal_info_matrix)
                 for i, animal_file in enumerate(animal_files):
                     animal_info = animal_info_matrix[i]
                     f.write(f"{animal_num},{cohort_num},{','.join([str(int(x)) for x in animal_info])}\n")
                     animal_num += 1
+        FileManager.pickle_obj(all_paths, os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
+
+    def pickle_obj(obj, file):
+        with open(file, 'wb') as f:
+            pickle.dump(obj, f)
+
+    def unpickle_obj(file):
+        with open(file, 'rb') as f:
+            return pickle.load(f)
+
+    def clearMetadata(self):
+        """
+        Clears the metadata files.
+        """
+        with open(self.FILES['COHORTS_FILE'], 'w') as f:
+            f.write('')
+        with open(self.FILES['ANIMALS_FILE'], 'w') as f:
+            f.write('')
 
     def setupFiles(self):
         """
@@ -67,6 +98,8 @@ class FileManager:
             os.makedirs(self.FILES['OUTPUT'])
         if not os.path.exists(self.FILES['METADATA']):
             os.makedirs(self.FILES['METADATA'])
+
+        self.clearMetadata()
 
         cohort_dict = self.buildCohortInfo()
         self.buildAnimalInfo(cohort_dict)

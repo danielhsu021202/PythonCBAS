@@ -8,6 +8,7 @@ class Settings:
             'STRADDLE_SESSIONS': False,
             'NUM_MODIFIERS': 1,
             'MODIFIER_RANGES': [6],
+            'MAX_SEQUENCE_LENGTH': 6,
         }
 
         self.files = {
