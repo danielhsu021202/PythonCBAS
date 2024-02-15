@@ -7,48 +7,53 @@ import os
 import time
 import numpy as np
 
+import datetime
 
+def format_time(seconds):
+    duration = datetime.timedelta(seconds=seconds)
+    if duration < datetime.timedelta(milliseconds=1):
+        return "{:.2f} microseconds".format(duration.microseconds)
+    elif duration < datetime.timedelta(seconds=1):
+        return "{:.2f} milliseconds".format(duration.microseconds / 1000)
+    elif duration < datetime.timedelta(minutes=1):
+        return "{:.2f} seconds".format(duration.total_seconds())
+    elif duration < datetime.timedelta(hours=1):
+        return "{:.2f} minutes".format(duration.total_seconds() / 60)
+    elif duration < datetime.timedelta(days=1):
+        return "{:.2f} hours".format(duration.total_seconds() / 3600)
+    else:
+        return "{:.2f} days".format(duration.total_seconds() / 86400)
 
 if __name__ == "__main__":
     start = time.time()
 
+    section_start = time.time()
     print("Starting PythonCBAS Engine...")
     print("Getting settings...")
     settings = Settings()
     FILES = settings.getFiles()
     ANIMAL_FILE_FORMAT = settings.getAnimalFileFormat()
     LANGUAGE = settings.getLanguage()
-    print("Settings retrieved. Time taken: ", time.time() - start)
+    print("Settings retrieved. Time taken: ", format_time(time.time() - section_start))
 
+    section_start = time.time()
     print("Setting up files...")
     fileManager = FileManager(FILES)
     fileManager.setupFiles()
-    print("Files set up. Time taken: ", time.time() - start)
+    print("Files set up. Time taken: ", format_time(time.time() - section_start))
 
+    section_start = time.time()
+    print("Processing sequences...")
     sequencesProcessor = SequencesProcessor(FILES, ANIMAL_FILE_FORMAT, LANGUAGE)
+    sequencesProcessor.processAllAnimals()
+    print("Sequences processed. Time taken: ", format_time(time.time() - section_start))
+
+    section_start = time.time()
+    print("Generating sequence files...")
     sequencesProcessor.generateSequenceFiles()
+    print("Sequence files generated. Time taken: ", format_time(time.time() - section_start))
 
-    print(f"Total Time: {time.time() - start}")
+    print(f"Total Time: {format_time(time.time() - start)}")
+
+    
     sys.exit()
-
-    sequencesProcessor = SequencesProcessor(FILES, ANIMAL_FILE_FORMAT, LANGUAGE)
-    mat = sequencesProcessor.getMatrix(os.path.join(FILES['DATA'], 'scn2aCoh1', 'anData0.txt'))
-    mat = sequencesProcessor.collapseModifiers(mat)
-    # FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], 'anData0_collapsed.txt'), mat)
-    # print(mat[(mat[:, ANIMAL_FILE_FORMAT['CHOICE_COL']] == 12) & (mat[:, ANIMAL_FILE_FORMAT['CONTINGENCY_COL']] == 0)])
-    mats = sequencesProcessor.splitContingency(mat)
-    sequencesProcessor.getAllLengthSequences(mats)
-    # for _ in np.arange(244):
-    #     mat = sequencesProcessor.getMatrix(os.path.join(FILES['DATA'], 'scn2aCoh1', 'anData0.txt'))
-    #     mat = sequencesProcessor.collapseModifiers(mat)
-    #     mats = sequencesProcessor.splitContingency(mat)
-    #     sequencesProcessor.getSequences(mats)
-    # sequencesProcessor.generateSequenceFiles()
-    
-    print(f"Total Time: {time.time() - start}")
-    
-
-    mat = getMatrix(os.path.join(FILES['DATA'], 'scn2aCoh1', 'anData0.txt'))
-    mat = collapseModifiers(mat)
-    # print(splitContingency(mat)[0])
-    print(mat)

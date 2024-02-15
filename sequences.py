@@ -50,29 +50,72 @@ class ElementFrequencyCounter:
 
 
 class SequenceManager:
-    def __init__(self):
+    """
+    Manages the sequence numbers as well as the trial numbers and animal numbers of each sequence.
+    Each SequenceManager object corresponds to a single sequence length and contingency.
+    """
+
+    def __init__(self, cont, seq_len):
+        self.cont = cont
+        self.seq_len = seq_len
+
         self.next_number = 0
-        self.sequences = {}
+        self.seq_nums = {}
+        self.animal_trials = []  # This is a 2D array
         
 
-    def registerSequence(self, sequence: tuple):
+    def registerSeqNum(self, sequence: tuple):
         """
         Assign a number to each new sequence and store it in the sequences dictionary.
         """
-        seq_num = self.sequences.get(sequence, None)
+        seq_num = self.seq_nums.get(sequence, None)
         if seq_num:
             return seq_num
         else:
-            self.sequences[sequence] = self.next_number
+            self.seq_nums[sequence] = self.next_number
             self.next_number += 1
             return self.next_number - 1
         
-    def __len__(self):
-        return len(self.sequences)
+    def registerAnimalAndTrial(self, animal_num: int, trial_num: int, seq_num: int):
+        """
+        Register the animal number and trial number of a sequence.
+        """
+        self.animal_trials.append([animal_num, trial_num, seq_num])
+        
     
-    def __max__(self):
+    def registerSequence(self, sequence: tuple, animal_num: int, trial_num: int):
+        """
+        Register a sequence and return its number.
+        """
+        seq_num = self.registerSeqNum(sequence)
+        self.registerAnimalAndTrial(animal_num, trial_num, seq_num)
+        
+    def genAllSeqFile(self, FILES):
+        """
+        Generate the allSeq file for this sequence length and contingency.
+        """
+        # Turn into a 2D array
+        mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
+        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeq_{self.cont}_{self.seq_len}.txt'), mat)
+    
+    def genAllSeqAllAnFile(self, FILES):
+        """
+        Generate the allSeqAllAn file for this sequence length and contingency.
+        """
+        # Turn into a 2D array
+        mat = np.array(self.animal_trials)
+        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeqAllAn_{self.cont}_{self.seq_len}.txt'), mat)
+    
+    def numUniqueSeqs(self):
         """Returns the largest sequence number registered."""
         return self.next_number - 1
+
+    def __len__(self):
+        """Returns the number of sequences registered, not unique."""
+        return len(self.animal_trials)
+    
+    
+    
         
     
         
@@ -83,14 +126,16 @@ class SequencesProcessor:
         self.COLUMNS = ANIMAL_FILE_FORMAT
         self.LANGUAGE = LANGUAGE
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
-        self.sequence_matrix = [[SequenceManager() for _ in np.arange(7)] for _ in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        # TODO: Generalize this to stuff other than just 7 contingencies
+        self.sequence_matrix = [[SequenceManager(cont, seq_len+1) for cont in np.arange(7)] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        self.current_animal_num = -1
 
-    def registerToSeqMatrix(self, sequence, length, cont):
+    def registerToSeqMatrix(self, sequence: tuple, length: int, cont: int, trial_num: int) -> int:
         """
         Given a sequence, its length, and its contingency, register it in the sequence_matrix.
         Returns the sequence number of the sequence.
         """
-        return self.sequence_matrix[length-1][cont].registerSequence(sequence)
+        return self.sequence_matrix[length-1][cont].registerSequence(sequence, self.current_animal_num, trial_num)
 
     def getMatrix(self, file):
         """Takes a text file and returns a numpy matrix"""
@@ -126,13 +171,13 @@ class SequencesProcessor:
         This gets run num_contingencies * MAX_SEQUENCE_LENGTH times per animal.
         """
         if not self.LANGUAGE['STRADDLE_SESSIONS']:
-            i = 0
+            i = 0  # This is also the trial number, since we uniquely identify sequences by their the first trial of occurence
             while i <= len(mat) - length:
                 last_idx_of_sequence = i + length - 1
                 if mat[i, self.COLUMNS['SESSION_NO_COL']] == mat[last_idx_of_sequence, self.COLUMNS['SESSION_NO_COL']]:
                     # If the first and last session numbers of this sequence are the same, add it to the set of sequences
                     sequence = tuple(mat[i:i+length, self.COLUMNS['CHOICE_COL']])
-                    self.registerToSeqMatrix(sequence, length, cont)
+                    self.registerToSeqMatrix(sequence, length, cont, i)
                     i += 1
                 else:
                     # Otherwise, we're straddling sessions, so we need to skip to the second session present in the relevant section
@@ -161,20 +206,31 @@ class SequencesProcessor:
 
     
 
-    def generateSequenceFiles(self):
+    def processAllAnimals(self):
         """
-        MAIN FUNCTION FOR THIS MODULE
+        ONE OF MAIN CALLED FUNCTION FOR THIS MODULE
+        Goes through all the animals and processes their sequences, registering them to the SequenceManager contained in 
+        self.sequence_matrix.
         """
         all_paths = FileManager.unpickle_obj(os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
         for animal_num, animal in enumerate(all_paths):
+            self.current_animal_num = animal_num
             mat = self.getMatrix(animal)
             mat = self.collapseModifiers(mat)
             mats_by_cont = self.splitContingency(mat)
             self.getAllLengthSequences(mats_by_cont)
-        sequence_counts = [[len(self.sequence_matrix[i][j]) for j in np.arange(7)] for i in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
-        print(np.array(sequence_counts))
-        print(sys.getsizeof(self.sequence_matrix))
-        print(sys.getsizeof(self.sequence_matrix) * 1000000 / 1000 / 1000)
+
+    def generateSequenceFiles(self):
+        """
+        ONE OF MAIN CALLED FUNCTION FOR THIS MODULE
+        Generates the allSeq and allSeqAllAn files for each sequence length and contingency.
+        """
+        for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
+            for cont in np.arange(7):
+                self.sequence_matrix[length][cont].genAllSeqFile(self.FILES)
+                self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES)
+
+       
         # print(self.sequence_matrix[0])
 
 
