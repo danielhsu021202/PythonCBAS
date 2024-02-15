@@ -50,6 +50,9 @@ class FileManager:
         Goes through the cohorts in order of the cohort_dict and processes the animal information for each cohort.
         Assigns each animal a number and writes it to the animals file in comma-separated format:
             animal number, cohort number, <all info in the info file>
+
+        Note:
+        The order of animals in animals.txt is the same as the order of animals in all_paths.pkl
         """
         animal_num = 0
         all_paths = []
