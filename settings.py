@@ -8,6 +8,7 @@ class Settings:
             'NUM_MODIFIERS': 1,
             'MODIFIER_RANGES': [6],
             'MAX_SEQUENCE_LENGTH': 6,
+            'NUM_CONTINGENCIES': 7,
         }
 
         self.criterion = {
@@ -36,6 +37,11 @@ class Settings:
             'MODIFIER_COL': 3,
         }
 
+        self.constants = {
+            'NaN': -1,
+            'inf': -2
+        }
+
         # Catalogue for the possible values of each attribute, in numerical order (0, 1, 2, ...)
         # For example, since while making the data, we set 0 to be male and 1 to be female, and it
         # appears this way in anInfo.txt, we have under SEX, 'Male' in index 0, and 'Female' in index 1.
@@ -57,6 +63,9 @@ class Settings:
     
     def getCriterion(self):
         return self.criterion
+    
+    def getConstants(self):
+        return self.constants
 
     def getCatalogue(self):
         return self.catalogue 
@@ -72,7 +81,6 @@ class Settings:
     def setCriterion(self, attr_dict: dict):
         """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
         assert attr_dict.keys() == self.criterion.keys()
-        assert all([isinstance(attr_dict[key], type(self.criterion[key])) for key in attr_dict.keys()])
         self.criterion = attr_dict
 
     # def setCriterion(self, order: int, number: int, include_failed: bool, allow_redemption: bool):

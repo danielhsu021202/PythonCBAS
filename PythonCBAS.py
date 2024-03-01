@@ -31,12 +31,13 @@ if __name__ == "__main__":
     print("Starting PythonCBAS Engine...")
     print("Getting settings...")
     settings = Settings()
-    settings.setCriterion({'ORDER': 0, 'NUMBER': float('inf'), 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': False})
+    settings.setCriterion({'ORDER': 4, 'NUMBER': 100, 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': False})
 
     FILES = settings.getFiles()
     ANIMAL_FILE_FORMAT = settings.getAnimalFileFormat()
     LANGUAGE = settings.getLanguage()
     CRITERION = settings.getCriterion()
+    CONSTANTS = settings.getConstants()
     print("Settings retrieved. Time taken: ", format_time(time.time() - section_start))
 
     section_start = time.time()
@@ -47,7 +48,7 @@ if __name__ == "__main__":
 
     section_start = time.time()
     print("Processing sequences...")
-    sequencesProcessor = SequencesProcessor(FILES, ANIMAL_FILE_FORMAT, LANGUAGE, CRITERION)
+    sequencesProcessor = SequencesProcessor(FILES, ANIMAL_FILE_FORMAT, LANGUAGE, CRITERION, CONSTANTS)
     sequencesProcessor.processAllAnimals()
     print("Sequences processed. Time taken: ", format_time(time.time() - section_start))
 
@@ -56,10 +57,10 @@ if __name__ == "__main__":
     sequencesProcessor.generateSequenceFiles()
     print("Sequence files generated. Time taken: ", format_time(time.time() - section_start))
 
-    section_start = time.time()
-    print("Finding criterion trial for just cont 0 len 1...")
-    sequencesProcessor.findCriterionTrial(0, 2)
-    print(f"Total Time: {format_time(time.time() - start)}")
+    # section_start = time.time()
+    # print("Finding criterion trial for just cont 0 len 1...")
+    # sequencesProcessor.findCriterionTrial(0, 2)
+    # print(f"Total Time: {format_time(time.time() - start)}")
 
 
     sys.exit()
