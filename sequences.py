@@ -156,7 +156,7 @@ class SequencesProcessor:
         Given an animal number, a contingency, and the number of trials to reach the criterion, register it in the criterion_matrix.
         """
         if orderZero:
-            self.criterion_matrix[animal_num][cont] = (new_trial_num, self.CONSTANTS['NaN'])
+            self.criterion_matrix[animal_num][cont] = (min(new_trial_num, self.CRITERION['NUMBER']), self.CONSTANTS['NaN'])
             return
         num_accomplished, trial_num = self.criterion_matrix[animal_num][cont]
         if num_accomplished == self.CRITERION['NUMBER']:
