@@ -1,6 +1,5 @@
 import os
 
-
 class Settings:
     def __init__(self):
         self.language = {
@@ -9,6 +8,15 @@ class Settings:
             'NUM_MODIFIERS': 1,
             'MODIFIER_RANGES': [6],
             'MAX_SEQUENCE_LENGTH': 6,
+        }
+
+        self.criterion = {
+            'ORDER': 0,
+            'NUMBER': float('inf'),
+            'INCLUDE_FAILED': True,  # Special case: If subject does not get to the criterion (e.g., want 200th trial but subject only completes 30)
+            'ALLOW_REDEMPTION': False,  # Do we exclude for every (subsequent) contingency (False), 
+                                        # or do we exclude it until it reaches the criterion again (True)?
+
         }
 
         self.files = {
@@ -46,15 +54,33 @@ class Settings:
 
     def getAnimalFileFormat(self):
         return self.animal_file_format
+    
+    def getCriterion(self):
+        return self.criterion
 
     def getCatalogue(self):
-        return self.catalogue   
+        return self.catalogue 
+
+
     
     def setLanguage(num_choices, modifier_ranges):
         """Sets the language for the experiment. The language is defined by the number of choices and the number of modifiers."""
         NUM_CHOICES = num_choices
         NUM_MODIFIERS = len(modifier_ranges)
         MODIFIER_RANGES = modifier_ranges
+
+    def setCriterion(self, attr_dict: dict):
+        """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
+        assert attr_dict.keys() == self.criterion.keys()
+        assert all([isinstance(attr_dict[key], type(self.criterion[key])) for key in attr_dict.keys()])
+        self.criterion = attr_dict
+
+    # def setCriterion(self, order: int, number: int, include_failed: bool, allow_redemption: bool):
+    #     """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
+    #     self.criterion['ORDER'] = order
+    #     self.criterion['NUMBER'] = number
+    #     self.criterion['INCLUDE_FAILED'] = include_failed
+    #     self.criterion['ALLOW_REDEMPTION'] = allow_redemption
 
 
 

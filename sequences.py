@@ -55,14 +55,17 @@ class SequenceManager:
     Each SequenceManager object corresponds to a single sequence length and contingency.
     """
 
-    def __init__(self, cont, seq_len):
-        self.cont = cont
-        self.seq_len = seq_len
+    def __init__(self):
 
         self.next_number = 0
         self.seq_nums = {}
         self.animal_trials = []  # This is a 2D array
         
+    def getSeqNums(self):
+        return self.seq_nums
+    
+    def getAnimalTrials(self):
+        return self.animal_trials
 
     def registerSeqNum(self, sequence: tuple):
         """
@@ -90,21 +93,21 @@ class SequenceManager:
         seq_num = self.registerSeqNum(sequence)
         self.registerAnimalAndTrial(animal_num, trial_num, seq_num)
         
-    def genAllSeqFile(self, FILES):
+    def genAllSeqFile(self, FILES, cont, seq_len):
         """
         Generate the allSeq file for this sequence length and contingency.
         """
         # Turn into a 2D array
         mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
-        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeq_{self.cont}_{self.seq_len}.txt'), mat)
+        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeq_{cont}_{seq_len}.txt'), mat)
     
-    def genAllSeqAllAnFile(self, FILES):
+    def genAllSeqAllAnFile(self, FILES, cont, seq_len):
         """
         Generate the allSeqAllAn file for this sequence length and contingency.
         """
         # Turn into a 2D array
         mat = np.array(self.animal_trials)
-        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeqAllAn_{self.cont}_{self.seq_len}.txt'), mat)
+        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
     
     def numUniqueSeqs(self):
         """Returns the largest sequence number registered."""
@@ -121,14 +124,22 @@ class SequenceManager:
         
 
 class SequencesProcessor:
-    def __init__(self, FILES, ANIMAL_FILE_FORMAT, LANGUAGE):
+    def __init__(self, FILES, ANIMAL_FILE_FORMAT, LANGUAGE, CRITERION):
         self.FILES = FILES
         self.COLUMNS = ANIMAL_FILE_FORMAT
         self.LANGUAGE = LANGUAGE
+        self.CRITERION = CRITERION
+
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
         # TODO: Generalize this to stuff other than just 7 contingencies
-        self.sequence_matrix = [[SequenceManager(cont, seq_len+1) for cont in np.arange(7)] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        self.sequence_matrix = [[SequenceManager() for cont in np.arange(7)] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
         self.current_animal_num = -1
+
+    def getSequenceManager(self, cont: int, length: int) -> SequenceManager:
+        """
+        Given a contingency and a length, return the SequenceManager object corresponding to that contingency and length.
+        """
+        return self.sequence_matrix[length-1][cont]
 
     def registerToSeqMatrix(self, sequence: tuple, length: int, cont: int, trial_num: int) -> int:
         """
@@ -138,7 +149,7 @@ class SequencesProcessor:
         return self.sequence_matrix[length-1][cont].registerSequence(sequence, self.current_animal_num, trial_num)
 
     def getMatrix(self, file):
-        """Takes a text file and returns a numpy matrix"""
+        """Takes a text file and returns a numpy matrix, enforcing 2D where if there's only one column, each row is its own subarray"""
         return np.genfromtxt(file, delimiter=',', dtype=int)
 
     def getContingency(self, mat, x):
@@ -155,9 +166,12 @@ class SequencesProcessor:
         mat[:, self.COLUMNS['CHOICE_COL']] = mat[:, self.COLUMNS['CHOICE_COL']] + mat[:, self.COLUMNS['MODIFIER_COL']] * self.LANGUAGE['NUM_CHOICES']
         return np.delete(mat, self.COLUMNS['MODIFIER_COL'], 1)
 
+
+
     def splitContingency(self, mat):
         """
         Takes a matrix and retrns a list of tuples, each tuple containing a matrix with a different contingency.
+        WORKS BEST IF THE MATRIX IS SORTED BY CONTINGENCY
         """
         # Split the matrix horizontally by the contingency column
         by_contingency = np.split(mat, np.where(np.diff(mat[:, self.COLUMNS['CONTINGENCY_COL']]))[0] + 1)
@@ -202,7 +216,41 @@ class SequencesProcessor:
                 self.getSequences(mat, length, cont)
                 # self.sequence_matrix[length-1][cont].registerSequences(sequences)
                 #print(f"Contingency {cont}, Length {length}, Num Sequences: {len(sequences)}")
+
+
+    def getSubmatrix(self, mat, col, val):
+        """
+        Returns the submatrix of mat where the column col is equal to val.
+        """
+        return mat[mat[:, col] == val]
+    
+    def perfectPerformance(self, sequence: tuple):
+        """
+        Return whether the sequence is exclusively rewarded, meaning each number is greater than or equal to NUM_CHOICES
+        """
+        return all([num >= self.LANGUAGE['NUM_CHOICES'] for num in sequence])
+
+    def findCriterionTrial(self, cont, seq_len):
+
+        seq_manager = self.getSequenceManager(cont, seq_len)
+        seq_nums = seq_manager.getSeqNums()
+        animal_trials = seq_manager.getAnimalTrials()
+        animal_trials = np.array(animal_trials)
         
+        # Testing code for just this one animal
+        an0 = self.getSubmatrix(animal_trials, 0, 0)
+        print(an0)
+        # Get all unique sequence #'s
+        seqs = self.getMatrix(os.path.join(self.FILES['OUTPUT'], f'allSeq_{cont}_{seq_len}.txt'))
+        seqs = [tuple(seq) if type(seq) == list else tuple([seq]) for seq in seqs]
+        print(seqs)
+   
+        unique_seq_nums = list(np.unique(an0[:, 2]))
+        unique_seqs = [seqs[num] for num in unique_seq_nums]
+        print(unique_seqs)
+        perfect_performance = list(filter(self.perfectPerformance, unique_seqs))
+        print(perfect_performance)
+
 
     
 
@@ -227,11 +275,8 @@ class SequencesProcessor:
         """
         for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
             for cont in np.arange(7):
-                self.sequence_matrix[length][cont].genAllSeqFile(self.FILES)
-                self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES)
-
-       
-        # print(self.sequence_matrix[0])
+                self.sequence_matrix[length][cont].genAllSeqFile(self.FILES, cont, length+1)
+                self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES, cont, length+1)
 
 
 
