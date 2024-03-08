@@ -180,6 +180,25 @@ class SequencesProcessor:
             # If the sequence performed is perfect, increment the criterion matrix.
             self.criterion_matrix[self.current_animal_num][cont] = (num_accomplished + 1, new_trial_num)
 
+    def postProcessCriterionMatrixCurrAnimalRow(self):
+        """
+        Post-process the criterion matrix to exclude animals that did not reach the criterion.
+        Turns the tuples into a single number, inf if the criterion was not reached, and 0 if the subject did not participate in that contingency.
+        Does this for a single row of the criterion matrix corresponding to the current animal being processed.
+        """
+        if self.CRITERION['ORDER'] == 0:
+            for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+                self.criterion_matrix[self.current_animal_num][cont] = self.criterion_matrix[self.current_animal_num][cont][0]
+        else:
+            for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+                num_accomplished, trial_num = self.criterion_matrix[self.current_animal_num][cont]
+                if num_accomplished == self.CONSTANTS['NaN']:
+                    self.criterion_matrix[self.current_animal_num][cont] = self.CONSTANTS['NaN']
+                elif num_accomplished < self.CRITERION['NUMBER']:
+                    self.criterion_matrix[self.current_animal_num][cont] = self.CONSTANTS['inf']
+                else:
+                    self.criterion_matrix[self.current_animal_num][cont] = trial_num
+
     def postProcessCriterionMatrix(self):
         """
         Post-process the criterion matrix to exclude animals that did not reach the criterion.
@@ -323,6 +342,7 @@ class SequencesProcessor:
             mat = self.collapseModifiers(mat)
             mats_by_cont = self.splitContingency(mat)
             self.getAllLengthSequences(mats_by_cont)
+            self.postProcessCriterionMatrixCurrAnimalRow()
 
     def generateSequenceFiles(self):
         """
@@ -335,7 +355,7 @@ class SequencesProcessor:
                 self.sequence_matrix[length][cont].genAllSeqFile(self.FILES, cont, length+1)
                 self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES, cont, length+1)
         
-        self.postProcessCriterionMatrix()
+        # self.postProcessCriterionMatrix()
         FileManager.writeMatrix(os.path.join(self.FILES['OUTPUT'], 
                                              f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.txt'), 
                                 self.criterion_matrix)

@@ -51,7 +51,8 @@ class CheckSequenceFiles(unittest.TestCase):
         Compare the criterion file generated for Order 4 Number 100 Include Failed True Allow Redemption True
         File names are the same
         """
-        self.assertTrue(FileManager.compareFiles(os.path.join(self.expected_dir, 'criterionMatrix_0_inf_True_True.txt'), os.path.join(self.output_dir, 'criterionMatrix_0_inf_True_True.txt')), "Criterion file is not the same in the output directory as in the expected directory.")
+        # self.assertTrue(FileManager.compareFiles(os.path.join(self.expected_dir, 'criterionMatrix_0_inf_True_True.txt'), os.path.join(self.output_dir, 'criterionMatrix_0_inf_True_True.txt')), "Criterion file is not the same in the output directory as in the expected directory.")
+        self.assertTrue(FileManager.compareFiles(os.path.join(self.expected_dir, 'criterionMatrix_4_100_True_True.txt'), os.path.join(self.output_dir, 'criterionMatrix_4_100_True_True.txt')), "Criterion file is not the same in the output directory as in the expected directory.")
 
 
 if __name__ == "__main__":
