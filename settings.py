@@ -15,9 +15,8 @@ class Settings:
             'ORDER': 0,
             'NUMBER': float('inf'),
             'INCLUDE_FAILED': True,  # Special case: If subject does not get to the criterion (e.g., want 200th trial but subject only completes 30)
-            'ALLOW_REDEMPTION': False,  # Do we exclude for every (subsequent) contingency (False), 
+            'ALLOW_REDEMPTION': True,  # Do we exclude for every (subsequent) contingency (False), 
                                         # or do we exclude it until it reaches the criterion again (True)?
-
         }
 
         self.files = {

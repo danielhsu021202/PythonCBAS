@@ -103,8 +103,17 @@ class FileManager:
             os.makedirs(self.FILES['METADATA'])
 
         self.clearMetadata()
+        # Clear output directory
+        for file in os.listdir(self.FILES['OUTPUT']):
+            os.remove(os.path.join(self.FILES['OUTPUT'], file))
 
         cohort_dict = self.buildCohortInfo()
         self.buildAnimalInfo(cohort_dict)
+
+    def compareFiles(file1, file2):
+        """Compares two files and returns True if they are the same, False otherwise"""
+        with open(file1, 'r') as f1, open(file2, 'r') as f2:
+            return f1.read() == f2.read()
+        
 
 
