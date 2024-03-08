@@ -3,6 +3,7 @@ from files import FileManager
 from settings import Settings
 import re
 import os
+import pandas as pd
 import numpy as np
 
 
@@ -54,6 +55,21 @@ class CheckSequenceFiles(unittest.TestCase):
         # self.assertTrue(FileManager.compareFiles(os.path.join(self.expected_dir, 'criterionMatrix_0_inf_True_True.txt'), os.path.join(self.output_dir, 'criterionMatrix_0_inf_True_True.txt')), "Criterion file is not the same in the output directory as in the expected directory.")
         self.assertTrue(FileManager.compareFiles(os.path.join(self.expected_dir, 'criterionMatrix_4_100_True_True.txt'), os.path.join(self.output_dir, 'criterionMatrix_4_100_True_True.txt')), "Criterion file is not the same in the output directory as in the expected directory.")
 
+    def test_seqCnts_file(self):
+        """
+        Compare the seqCnts file generated
+        File names are the same
+        """
+        # Check if the sizes are the same
+        expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'seqCnts_', f)]
+        output_files = [f for f in os.listdir(self.output_dir) if re.match(r'seqCnts_', f)]
+        for f in expected_files:
+            self.assertTrue(f in output_files, f"File {f} not found in output directory.")
+            # Read the files using pandas
+            expected = pd.read_csv(os.path.join(self.expected_dir, f), delimiter=',')
+            output = pd.read_csv(os.path.join(self.output_dir, f), delimiter=',')
+            # Check if the sizes are the same
+            self.assertEqual(expected.shape, output.shape, f"File {f} is not the same size in the output directory as in the expected directory.")
 
 if __name__ == "__main__":
     # Run tests from CheckSequenceFiles

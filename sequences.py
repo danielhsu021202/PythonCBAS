@@ -60,7 +60,7 @@ class SequenceManager:
         self.next_number = 0
         self.seq_nums = {}  # Maps sequences to numbers
         self.animal_trials = []  # This is a 2D array for allSeqAllAn
-        self.seq_counts = []  # This is a 2D array for seqCnts
+        self.seq_counts = np.zeros((1, 1)) # This is a 2D array for seqCnts
         
     def getSeqNums(self):
         return self.seq_nums
@@ -95,11 +95,31 @@ class SequenceManager:
         """
         seq_num = self.registerSeqNum(sequence)
         self.registerAnimalAndTrial(animal_num, trial_num, seq_num)
+        return seq_num
 
-    def registerSeqCnt(self):
+    def updateSeqCnt(self, seq_num: int, animal_num: int, increment: bool):
         """
-        Register the sequence counts for this sequence length and contingency.
+        Increment the sequence counts for this sequence length and contingency.
+        The sequence counts matrix is animal numbers as rows by sequence numbers as columns.
         """
+        # If seq_num is greater than or equal to the number of columns, we double the columns or add enough columns to accommodate the new sequence number, whichever is greater
+        rows, cols = self.seq_counts.shape
+        if seq_num >= cols:
+            cols_to_add = max(seq_num - cols + 1, cols * 2)
+            self.seq_counts = np.append(self.seq_counts, np.zeros((len(self.seq_counts), cols_to_add)), axis=1)
+        # If animal_num is greater than or equal to the number of rows, we add enough rows to accommodate the new animal number
+        if animal_num >= rows:
+            self.seq_counts = np.append(self.seq_counts, np.zeros((animal_num - rows + 1, len(self.seq_counts[0]))), axis=0)
+        # Increment the count
+        if increment:
+            self.seq_counts[animal_num][seq_num] += 1
+
+    def trimSeqCnts(self):
+        """
+        Trim columns with index greater than the maximum sequence number.
+        """
+        self.seq_counts = self.seq_counts[:, :self.next_number]
+        # self.seq_counts = self.seq_counts[:, np.any(self.seq_counts, axis=0)]
         
         
     def genAllSeqFile(self, FILES, cont, seq_len):
@@ -117,6 +137,12 @@ class SequenceManager:
         # Turn into a 2D array
         mat = np.array(self.animal_trials)
         FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
+
+    def genSeqCntsFile(self, FILES, cont, seq_len):
+        """
+        Generate the seqCnts file for this sequence length and contingency.
+        """
+        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
     
     def numUniqueSeqs(self):
         """Returns the largest sequence number registered."""
@@ -141,7 +167,6 @@ class SequencesProcessor:
         self.CONSTANTS = CONSTANTS
 
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
-        # TODO: Generalize this to stuff other than just 7 contingencies
         self.sequence_matrix = [[SequenceManager() for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
         self.criterion_matrix = None  # This is initialized in the processAllAnimals() function
         self.current_animal_num = self.CONSTANTS['NaN']
@@ -163,22 +188,26 @@ class SequencesProcessor:
     def updateCriterionMatrix(self, cont: int, new_trial_num: int, sequence: tuple, orderZero = False):
         """
         Given an animal number, a contingency, and the number of trials to reach the criterion, register it in the criterion_matrix.
+        Returns whether the criterion has been reached (which means we've got our trial number).
+            If True, then we can stop updating the sequence counts.
+            If False, then we need to keep updating the sequence counts.
         """
         if orderZero:
             # If we're working with order 0, then we're just registering the total number of trials performed
             self.criterion_matrix[self.current_animal_num][cont] = (min(new_trial_num, self.CRITERION['NUMBER']), self.CONSTANTS['NaN'])
-            return
-        num_accomplished, trial_num = self.criterion_matrix[self.current_animal_num][cont]
-        if num_accomplished == self.CRITERION['NUMBER']:
-            # If the criterion number has already been reached, we're done
-            return
-        if new_trial_num is None:
-            # If the trial number is None, then the animal did not participate in this contingency
-            self.criterion_matrix[self.current_animal_num][cont] = (self.CONSTANTS['NaN'], self.CONSTANTS['NaN'])
-            return
-        if self.perfectPerformance(sequence):
-            # If the sequence performed is perfect, increment the criterion matrix.
-            self.criterion_matrix[self.current_animal_num][cont] = (num_accomplished + 1, new_trial_num)
+            return True
+        else:
+            num_accomplished, _ = self.criterion_matrix[self.current_animal_num][cont]
+            if num_accomplished == self.CRITERION['NUMBER']: 
+                return True # If the criterion number has already been reached, we're done
+            if new_trial_num is None:
+                # If the trial number is None, then the animal did not participate in this contingency
+                self.criterion_matrix[self.current_animal_num][cont] = (self.CONSTANTS['NaN'], self.CONSTANTS['NaN'])
+                return False
+            if self.perfectPerformance(sequence):
+                # If the sequence performed is perfect, increment the criterion matrix.
+                self.criterion_matrix[self.current_animal_num][cont] = (num_accomplished + 1, new_trial_num)
+                return False
 
     def postProcessCriterionMatrixCurrAnimalRow(self):
         """
@@ -199,26 +228,12 @@ class SequencesProcessor:
                 else:
                     self.criterion_matrix[self.current_animal_num][cont] = trial_num
 
-    def postProcessCriterionMatrix(self):
+    def updateSequenceCounts(self, length: int, cont: int, seq_num: int, increment: bool):
         """
-        Post-process the criterion matrix to exclude animals that did not reach the criterion.
-        Turns the tuples into a single number, inf if the criterion was not reached, and 0 if the subject did not participate in that contingency.
+        Increment the sequence counts for this sequence length and contingency.
+        If increment is False, we are just registering the sequence number and animal number to the sequence counts matrix, so no incrementing needed.
         """
-        if self.CRITERION['ORDER'] == 0:
-            for animal_num in np.arange(self.total_animals):
-                for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
-                    self.criterion_matrix[animal_num][cont] = self.criterion_matrix[animal_num][cont][0]
-        else:
-            for animal_num in np.arange(self.total_animals):
-                for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
-                    num_accomplished, trial_num = self.criterion_matrix[animal_num][cont]
-                    if num_accomplished == self.CONSTANTS['NaN']:
-                        self.criterion_matrix[animal_num][cont] = self.CONSTANTS['NaN']
-                    elif num_accomplished < self.CRITERION['NUMBER']:
-                        self.criterion_matrix[animal_num][cont] = self.CONSTANTS['inf']
-                    else:
-                        self.criterion_matrix[animal_num][cont] = trial_num
-
+        self.sequence_matrix[length-1][cont].updateSeqCnt(seq_num, self.current_animal_num, increment)
 
     def getMatrix(self, file):
         """Takes a text file and returns a numpy matrix, enforcing 2D where if there's only one column, each row is its own subarray"""
@@ -259,7 +274,7 @@ class SequencesProcessor:
 
     def getAllLengthSequences(self, mats: list[tuple[np.array, int]]):
         """
-        Takes a list of tuples, each containing a matrix and a contingency number.
+        Takes a list of tuples: (mat, cont)
         Get all sequences of length up to MAX_SEQUENCE_LENGTH for each contingency.
         This gets run once per animal.
         """
@@ -267,41 +282,51 @@ class SequencesProcessor:
             lengths = set(np.arange(1, self.LANGUAGE['MAX_SEQUENCE_LENGTH'] + 1))
             if self.CRITERION['ORDER'] == 0:
                 # Then pass in the total number of trials performed
-                self.updateCriterionMatrix(cont, len(mat), None, orderZero = True)
-            # For each length, get all the sequences
-            for length in np.arange(1, self.LANGUAGE['MAX_SEQUENCE_LENGTH'] + 1):
-                self.getSequences(mat, length, cont)
+                self.updateCriterionMatrix(cont, len(mat), None, orderZero=True)
+            else:
+                # We process the sequences corresponding to the criterion order first
+                self.getSequences(mat, self.CRITERION['ORDER'], cont, is_order_length=True)
+                lengths.remove(self.CRITERION['ORDER'])
+            # For each remaining length, get all the sequences
+            for length in lengths:
+                self.getSequences(mat, length, cont, is_order_length=False)
                 # self.sequence_matrix[length-1][cont].registerSequences(sequences)
                 #print(f"Contingency {cont}, Length {length}, Num Sequences: {len(sequences)}")
 
-    def getSequences(self, mat, length, cont):
+    def getSequences(self, mat, length: int, cont: int, is_order_length: bool):
         """
         Given a matrix and a length, returns a set of all the sequences of that length.
         Straddles sessions if STRADDLE_SESSIONS is True, otherwise only considers sequences within the same session.
+        Processes criterion if is_order_length is True.
+        Increments the sequence counts matrix while we are on trial up to and including the criterion trial.
         This gets run num_contingencies * MAX_SEQUENCE_LENGTH times per animal.
         """
         
         
         if not self.LANGUAGE['STRADDLE_SESSIONS']:
-            i = 0  # This is also the trial number, since we uniquely identify sequences by their the first trial of occurence
-            while i <= len(mat) - length:
-                last_idx_of_sequence = i + length - 1
-                if mat[i, self.COLUMNS['SESSION_NO_COL']] == mat[last_idx_of_sequence, self.COLUMNS['SESSION_NO_COL']]:
+            trial = 0  # We uniquely identify sequences by their the first trial of occurence
+            while trial <= len(mat) - length:
+                last_idx_of_sequence = trial + length - 1
+                if mat[trial, self.COLUMNS['SESSION_NO_COL']] == mat[last_idx_of_sequence, self.COLUMNS['SESSION_NO_COL']]:
                     # If the first and last session numbers of this sequence are the same, add it to the set of sequences
-                    sequence = tuple(mat[i:i+length, self.COLUMNS['CHOICE_COL']])
-                    self.registerToSeqMatrix(sequence, length, cont, i)
+                    sequence = tuple(mat[trial:trial+length, self.COLUMNS['CHOICE_COL']])
+                    seq_num = self.registerToSeqMatrix(sequence, length, cont, trial)
                     
-                    # Criterion
-                    if self.CRITERION['ORDER'] == length:
-                        self.updateCriterionMatrix(cont, i, sequence)
-                        
+                    # Updating the criterion matrix if we're on the criterion order
+                    if is_order_length:
+                        criterion_reached = self.updateCriterionMatrix(cont, trial, sequence)
+                        # If the criterion has not been reached, we need to keep updating the sequence counts
+                        self.updateSequenceCounts(length, cont, seq_num, not criterion_reached)
+                    else:
+                        # Otherwise, the criterion has already been processed and we can now use the criterion trial number to update the sequence counts
+                        self.updateSequenceCounts(length, cont, seq_num, trial <= self.criterion_matrix[self.current_animal_num][cont][1])
 
-                    i += 1
+                    trial += 1
                 else:
                     # Otherwise, we're straddling sessions, so we need to skip to the second session present in the relevant section
                     # Even if there's a session caught in the middle, skipping to second session will just trigger this case again, so it will handle itself
-                    relevant_section = mat[i:last_idx_of_sequence+1, self.COLUMNS['SESSION_NO_COL']]
-                    i += np.where(relevant_section != relevant_section[0])[0][0]
+                    relevant_section = mat[trial:last_idx_of_sequence+1, self.COLUMNS['SESSION_NO_COL']]
+                    trial += np.where(relevant_section != relevant_section[0])[0][0]
         else:
             for i in np.arange(len(mat) - length):
                 sequence = tuple(mat[i:i+length, self.COLUMNS['CHOICE_COL']])
@@ -343,6 +368,11 @@ class SequencesProcessor:
             mats_by_cont = self.splitContingency(mat)
             self.getAllLengthSequences(mats_by_cont)
             self.postProcessCriterionMatrixCurrAnimalRow()
+        
+        # Trim the sequence counts matrices
+        for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
+            for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+                self.sequence_matrix[length][cont].trimSeqCnts()
 
     def generateSequenceFiles(self):
         """
@@ -354,6 +384,7 @@ class SequencesProcessor:
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
                 self.sequence_matrix[length][cont].genAllSeqFile(self.FILES, cont, length+1)
                 self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES, cont, length+1)
+                self.sequence_matrix[length][cont].genSeqCntsFile(self.FILES, cont, length+1)
         
         # self.postProcessCriterionMatrix()
         FileManager.writeMatrix(os.path.join(self.FILES['OUTPUT'], 
