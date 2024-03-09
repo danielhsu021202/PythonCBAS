@@ -114,6 +114,15 @@ class SequenceManager:
         if increment:
             self.seq_counts[animal_num][seq_num] += 1
 
+    def setParticipationSeqCnts(self, animal_nums: list[int], null_val: int):
+        """
+        Sets the whole row in the sequence counts matrix to null_val.
+        """
+        null_array = np.full(len(self.seq_counts[0]), null_val)
+        for animal_num in animal_nums:
+            self.seq_counts[animal_num] = null_array
+        
+
     def trimSeqCnts(self):
         """
         Trim columns with index greater than the maximum sequence number.
@@ -171,6 +180,8 @@ class SequencesProcessor:
         self.criterion_matrix = None  # This is initialized in the processAllAnimals() function
         self.current_animal_num = self.CONSTANTS['NaN']
         self.total_animals = self.CONSTANTS['NaN']
+
+        self.missing_contingencies = {}  # Maps contingency to a list of animals that did not participate in that contingency
 
     def getSequenceManager(self, cont: int, length: int) -> SequenceManager:
         """
@@ -235,6 +246,15 @@ class SequencesProcessor:
         """
         self.sequence_matrix[length-1][cont].updateSeqCnt(seq_num, self.current_animal_num, increment)
 
+    def registerMissingContingency(self, cont: int):
+        """
+        Register the missing contingency for the current animal.
+        """
+        if cont in self.missing_contingencies:
+            self.missing_contingencies[cont].append(self.current_animal_num)
+        else:
+            self.missing_contingencies[cont] = [self.current_animal_num]
+
     def getMatrix(self, file):
         """Takes a text file and returns a numpy matrix, enforcing 2D where if there's only one column, each row is its own subarray"""
         return np.genfromtxt(file, delimiter=',', dtype=int)
@@ -266,6 +286,7 @@ class SequencesProcessor:
         for missing_contingency in missing_contingencies:
             # Set the trial # to -1 for in the criterion_matrix
             self.updateCriterionMatrix(missing_contingency, None, None)
+            self.registerMissingContingency(missing_contingency)  # Register the missing contingency for the current animal
 
         # Split the matrix horizontally by the contingency column
         by_contingency = np.split(mat, np.where(np.diff(mat[:, self.COLUMNS['CONTINGENCY_COL']]))[0] + 1)
@@ -374,6 +395,13 @@ class SequencesProcessor:
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
                 self.sequence_matrix[length][cont].trimSeqCnts()
 
+        # Set the missing contingencies to NaN in the sequence counts matrices
+        for missing_cont in self.missing_contingencies.keys():
+            # Get all the SequenceManager objects for this contingency
+            col = [self.sequence_matrix[length][missing_cont] for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+            for seq_manager in col:
+                seq_manager.setParticipationSeqCnts(self.missing_contingencies[missing_cont], self.CONSTANTS['NaN'])
+
     def generateSequenceFiles(self):
         """
         ONE OF MAIN CALLED FUNCTION FOR THIS MODULE
@@ -396,41 +424,6 @@ class SequencesProcessor:
         Generates the sequenceCounts file for each sequence length and contingency.
         """
         pass
-
-    
-# Generate 1000000 sequences of length 6 and see if registerSequence or registerSequence2 is faster
-# sequences = [tuple(np.random.randint(1, 10, 6)) for _ in np.arange(1000000)]
-# start = time.time()
-# sequenceManager = SequenceManager()
-# for sequence in sequences:
-#     sequenceManager.registerSequence(sequence)
-# print(f"Time for registerSequence: {time.time() - start}")
-# start = time.time()
-# sequenceManager = SequenceManager()
-# for sequence in sequences:
-#     sequenceManager.registerSequence2(sequence)
-# print(f"Time for registerSequence2: {time.time() - start}")
-
-
-
-
-
-
-# def getSequences(mat, length):
-#     """
-#     Takes a matrix and returns a sorted list of the sequences of the given length.
-#     Checks with STRADDLE_SESSIONS to see if it should straddle sessions.
-#     """
-#     # Collects windows of the given length and puts it into the ElementFrequencyCounter.
-#     counter = ElementFrequencyCounter()
-#     if LANGUAGE['STRADDLE_SESSIONS']:
-#         for i in np.arange(len(mat) - length):
-#             counter.push(tuple(mat[i:i+length, ANIMAL_FILE_FORMAT['CHOICE_COL']]))
-#     else:
-#         for i in np.arange(len(mat) - length):
-#             if mat[i, ANIMAL_FILE_FORMAT['SESSION_NO_COL']] == mat[i+length, ANIMAL_FILE_FORMAT['SESSION_NO_COL']]:
-#                 counter.push(tuple(mat[i:i+length, ANIMAL_FILE_FORMAT['CHOICE_COL']]))
-#     return counter.get_sorted_elements()
 
 
     
