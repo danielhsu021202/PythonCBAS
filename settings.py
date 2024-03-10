@@ -20,7 +20,7 @@ class Settings:
         }
 
         self.files = {
-            'DATA': 'scn2aDataSwapped/',
+            'DATA': 'Data/scn2aDataSwapped/',
             'OUTPUT': 'output/',
             'METADATA': 'metadata/',
             'EXPECTED_OUTPUT': 'expected_output_scn2a/',

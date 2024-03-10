@@ -42,7 +42,7 @@ class FileManager:
         return np.atleast_2d(np.genfromtxt(file, delimiter=',', dtype=int))
     
     def writeMatrix(file, mat):
-        """Writes a numpy matrix to a text file"""
+        """Writes a numpy matrix to a text file. Don't write an extra line"""
         np.savetxt(file, mat, delimiter=',', fmt='%d')
 
     def buildAnimalInfo(self, cohort_dict):

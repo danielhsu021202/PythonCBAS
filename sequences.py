@@ -76,7 +76,7 @@ class SequenceManager:
         Assign a number to each new sequence and store it in the sequences dictionary.
         """
         seq_num = self.seq_nums.get(sequence, None)
-        if seq_num:
+        if seq_num is not None:
             return seq_num
         else:
             self.seq_nums[sequence] = self.next_number
@@ -367,9 +367,6 @@ class SequencesProcessor:
             return False
         return all([num >= self.LANGUAGE['NUM_CHOICES'] for num in sequence])
 
-    def generateSequenceCounts(self):
-        pass
-
 
     
 
@@ -393,6 +390,7 @@ class SequencesProcessor:
         # Trim the sequence counts matrices
         for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+                print(f"Next number for {cont}_{length+1}: {self.sequence_matrix[length][cont].next_number}")
                 self.sequence_matrix[length][cont].trimSeqCnts()
 
         # Set the missing contingencies to NaN in the sequence counts matrices
