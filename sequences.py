@@ -219,6 +219,14 @@ class SequencesProcessor:
                 # If the sequence performed is perfect, increment the criterion matrix.
                 self.criterion_matrix[self.current_animal_num][cont] = (num_accomplished + 1, new_trial_num)
                 return False
+            
+    def perfectPerformance(self, sequence: tuple):
+        """
+        Return whether the sequence is exclusively rewarded, meaning each number is greater than or equal to NUM_CHOICES
+        """
+        if not sequence:
+            return False
+        return all([num >= self.LANGUAGE['NUM_CHOICES'] for num in sequence])
 
     def postProcessCriterionMatrixCurrAnimalRow(self):
         """
@@ -311,8 +319,6 @@ class SequencesProcessor:
             # For each remaining length, get all the sequences
             for length in lengths:
                 self.getSequences(mat, length, cont, is_order_length=False)
-                # self.sequence_matrix[length-1][cont].registerSequences(sequences)
-                #print(f"Contingency {cont}, Length {length}, Num Sequences: {len(sequences)}")
 
     def getSequences(self, mat, length: int, cont: int, is_order_length: bool):
         """
@@ -340,7 +346,10 @@ class SequencesProcessor:
                         self.updateSequenceCounts(length, cont, seq_num, not criterion_reached)
                     else:
                         # Otherwise, the criterion has already been processed and we can now use the criterion trial number to update the sequence counts
-                        self.updateSequenceCounts(length, cont, seq_num, trial <= self.criterion_matrix[self.current_animal_num][cont][1])
+                        criterion_trial = self.criterion_matrix[self.current_animal_num][cont][1]
+                        if criterion_trial < self.CRITERION['NUMBER']:
+                            criterion_trial = float('inf')
+                        self.updateSequenceCounts(length, cont, seq_num, trial <= criterion_trial)
 
                     trial += 1
                 else:
@@ -359,13 +368,7 @@ class SequencesProcessor:
         """
         return mat[mat[:, col] == val]
     
-    def perfectPerformance(self, sequence: tuple):
-        """
-        Return whether the sequence is exclusively rewarded, meaning each number is greater than or equal to NUM_CHOICES
-        """
-        if not sequence:
-            return False
-        return all([num >= self.LANGUAGE['NUM_CHOICES'] for num in sequence])
+   
 
 
     
@@ -390,7 +393,6 @@ class SequencesProcessor:
         # Trim the sequence counts matrices
         for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
-                print(f"Next number for {cont}_{length+1}: {self.sequence_matrix[length][cont].next_number}")
                 self.sequence_matrix[length][cont].trimSeqCnts()
 
         # Set the missing contingencies to NaN in the sequence counts matrices
