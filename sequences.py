@@ -18,7 +18,7 @@ from random import randint
 
 from files import FileManager
 
-
+count_4_0 = 0
 
 
 class ElementFrequencyCounter:
@@ -55,12 +55,15 @@ class SequenceManager:
     Each SequenceManager object corresponds to a single sequence length and contingency.
     """
 
-    def __init__(self):
+    def __init__(self, cont: int, length: int):
 
         self.next_number = 0
         self.seq_nums = {}  # Maps sequences to numbers
         self.animal_trials = []  # This is a 2D array for allSeqAllAn
         self.seq_counts = np.zeros((1, 1)) # This is a 2D array for seqCnts
+
+        self.cont = cont
+        self.length = length
         
     def getSeqNums(self):
         return self.seq_nums
@@ -113,6 +116,7 @@ class SequenceManager:
         # Increment the count
         if increment:
             self.seq_counts[animal_num][seq_num] += 1
+
 
     def setParticipationSeqCnts(self, animal_nums: list[int], null_val: int):
         """
@@ -176,7 +180,7 @@ class SequencesProcessor:
         self.CONSTANTS = CONSTANTS
 
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
-        self.sequence_matrix = [[SequenceManager() for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        self.sequence_matrix = [[SequenceManager(cont, seq_len+1) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
         self.criterion_matrix = None  # This is initialized in the processAllAnimals() function
         self.current_animal_num = self.CONSTANTS['NaN']
         self.total_animals = self.CONSTANTS['NaN']
@@ -203,18 +207,18 @@ class SequencesProcessor:
             If True, then we can stop updating the sequence counts.
             If False, then we need to keep updating the sequence counts.
         """
+        if new_trial_num is None:
+            # If the trial number is None, then the animal did not participate in this contingency
+            self.criterion_matrix[self.current_animal_num][cont] = (self.CONSTANTS['NaN'], self.CONSTANTS['NaN'])
+            return False
         if orderZero:
             # If we're working with order 0, then we're just registering the total number of trials performed
             self.criterion_matrix[self.current_animal_num][cont] = (min(new_trial_num, self.CRITERION['NUMBER']), self.CONSTANTS['NaN'])
             return True
         else:
-            num_accomplished, _ = self.criterion_matrix[self.current_animal_num][cont]
+            num_accomplished, _ = self.criterion_matrix[self.current_animal_num][cont]    
             if num_accomplished == self.CRITERION['NUMBER']: 
                 return True # If the criterion number has already been reached, we're done
-            if new_trial_num is None:
-                # If the trial number is None, then the animal did not participate in this contingency
-                self.criterion_matrix[self.current_animal_num][cont] = (self.CONSTANTS['NaN'], self.CONSTANTS['NaN'])
-                return False
             if self.perfectPerformance(sequence):
                 # If the sequence performed is perfect, increment the criterion matrix.
                 self.criterion_matrix[self.current_animal_num][cont] = (num_accomplished + 1, new_trial_num)
@@ -247,11 +251,23 @@ class SequencesProcessor:
                 else:
                     self.criterion_matrix[self.current_animal_num][cont] = trial_num
 
+    def findCriterionTrial(self, cont: int):
+        num_accomplished, trial_num = self.criterion_matrix[self.current_animal_num][cont]
+        if num_accomplished == self.CONSTANTS['NaN']:
+            return self.CONSTANTS['NaN']
+        elif num_accomplished < self.CRITERION['NUMBER']:
+            return float('inf')
+        else:
+            return trial_num
+
+
     def updateSequenceCounts(self, length: int, cont: int, seq_num: int, increment: bool):
         """
         Increment the sequence counts for this sequence length and contingency.
         If increment is False, we are just registering the sequence number and animal number to the sequence counts matrix, so no incrementing needed.
         """
+        
+
         self.sequence_matrix[length-1][cont].updateSeqCnt(seq_num, self.current_animal_num, increment)
 
     def registerMissingContingency(self, cont: int):
@@ -346,10 +362,11 @@ class SequencesProcessor:
                         self.updateSequenceCounts(length, cont, seq_num, not criterion_reached)
                     else:
                         # Otherwise, the criterion has already been processed and we can now use the criterion trial number to update the sequence counts
-                        criterion_trial = self.criterion_matrix[self.current_animal_num][cont][1]
-                        if criterion_trial < self.CRITERION['NUMBER']:
-                            criterion_trial = float('inf')
-                        self.updateSequenceCounts(length, cont, seq_num, trial <= criterion_trial)
+                        # num_accomplished = self.criterion_matrix[self.current_animal_num][cont][0]
+                        # if num_accomplished <= self.CRITERION['NUMBER']:
+                        #     num_accomplished = float('inf')
+                        #TODO: it's not trial... it's number accomplished. Keep track of this similarly to criterion matrix and post process too.
+                        self.updateSequenceCounts(length, cont, seq_num, trial <= self.findCriterionTrial(cont))
 
                     trial += 1
                 else:

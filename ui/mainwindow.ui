@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>853</width>
+    <height>660</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,12 +19,30 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
-     <height>24</height>
+     <width>853</width>
+     <height>22</height>
     </rect>
    </property>
+   <widget class="QMenu" name="temporary_menu">
+    <property name="title">
+     <string>Temporary Running</string>
+    </property>
+    <addaction name="actionRun_CBAS"/>
+   </widget>
+   <widget class="QMenu" name="menuAppearance">
+    <property name="title">
+     <string>Appearance</string>
+    </property>
+   </widget>
+   <addaction name="temporary_menu"/>
+   <addaction name="menuAppearance"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionRun_CBAS">
+   <property name="text">
+    <string>Run CBAS</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>

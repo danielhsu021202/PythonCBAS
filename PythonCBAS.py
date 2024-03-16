@@ -6,6 +6,17 @@ import sys
 import os
 import time
 import numpy as np
+import re
+
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QTreeWidgetItemIterator
+from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtCore import Qt
+
+import qdarktheme
+
+from ui.MainWindow import Ui_MainWindow
+
+from FileViewer import FileViewer
 
 import datetime
 
@@ -24,7 +35,8 @@ def format_time(seconds):
     else:
         return "{:.2f} days".format(duration.total_seconds() / 86400)
 
-if __name__ == "__main__":
+
+def startCBASTerminal():
     divider = "=" * 65
 
     start = time.time()
@@ -71,4 +83,46 @@ if __name__ == "__main__":
     print(f"Total Time: {format_time(time.time() - start)}")
 
 
-    sys.exit()
+class PythonCBAS(QMainWindow, Ui_MainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+        self.setWindowTitle("PythonCBAS")
+
+        
+
+        self.setUpMenuBar()
+
+
+
+        # Add the File Viewer Frame to the main window
+        layout = QVBoxLayout()
+        layout.addWidget(FileViewer())
+        self.centralwidget.setLayout(layout)
+
+        # Set size
+        self.resize(1200, 720)
+
+
+        
+
+    def setUpMenuBar(self):
+        self.menubar = self.menuBar()
+        self.menubar.setNativeMenuBar(False)  # For macOS
+        self.actionRun_CBAS.triggered.connect(self.runCBAS)
+
+    def runCBAS(self):
+        startCBASTerminal()
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+
+    
+    # Set all widgets to light theme
+
+
+    
+    window = PythonCBAS()
+    window.show()
+    sys.exit(app.exec())
