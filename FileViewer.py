@@ -87,7 +87,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.setupUi(self)
 
         self.directories = set()
-        self.df = pd.DataFrame()
+        self.df = None
 
         self.mapButtonActions()
         self.fileTree.itemDoubleClicked.connect(self.openFile)
@@ -145,7 +145,8 @@ class FileViewer(QWidget, Ui_FileViewer):
             self.df = pd.read_csv(item.data(0, Qt.ItemDataRole.UserRole))
             self.df.columns = [str(i) for i in range(len(self.df.columns))]
             pd_table = PandasTable(self.df)
-            self.dataLayout.replaceWidget(self.dataLayout.itemAt(0).widget(), pd_table)
+            self.dataTableLayout.replaceWidget(self.dataTableLayout.itemAt(0).widget(), pd_table)
+            self.fileNameLabel.setText(os.path.basename(item.data(0, Qt.ItemDataRole.UserRole)))
 
 
     

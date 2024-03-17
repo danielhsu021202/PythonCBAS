@@ -11,6 +11,21 @@ from sys import getsizeof
 
 
 ### SETUP METADATA ###
+class CBASFile:
+    def __init__(self, name, type, data):
+        self.name = name
+        self.type = type
+        self.data = data
+
+    def export(self, filepath, type="csv"):
+        """Exports the file to the given type"""
+        if type == "csv":
+            # TODO: Type checking
+            FileManager.writeMatrix(filepath, self.data)
+
+    def __eq__(self, other):
+        pass
+
 class FileManager:
     def __init__(self, FILES):
         self.FILES = FILES
@@ -81,6 +96,14 @@ class FileManager:
     def unpickle_obj(file):
         with open(file, 'rb') as f:
             return pickle.load(f)
+        
+    def writeCBASFile(filepath, fileobj: CBASFile):
+        """Writes a CBASFile object to a file"""
+        FileManager.pickle_obj(fileobj, filepath)
+
+    def readCBASFile(filepath) -> CBASFile:
+        """Reads a CBASFile object from a file"""
+        return FileManager.unpickle_obj(filepath)
 
     def clearMetadata(self):
         """
@@ -115,5 +138,7 @@ class FileManager:
         with open(file1, 'r') as f1, open(file2, 'r') as f2:
             return f1.read() == f2.read()
         
+
+
 
 
