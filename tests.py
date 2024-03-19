@@ -21,13 +21,13 @@ class CheckSequenceFiles(unittest.TestCase):
         """
         Compare the size of all files from the expected directory whose name starts with 'allSeq_'
         """
-        expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'allSeq_', f)]
-        output_files = [f for f in os.listdir(self.output_dir) if re.match(r'allSeq_', f)]
+        expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'allSeq_', f) and (not f.startswith('.')) and not f.startswith('allSeq_0')]
+        output_files = [f for f in os.listdir(self.output_dir) if re.match(r'allSeq_', f) and (not f.startswith('.')) and not f.startswith('allSeq_0')]
         for f in expected_files:
             self.assertTrue(f in output_files, f"File {f} not found in output directory.")
             # Expected output needs to be transposed first
-            expected_matrix = np.loadtxt(os.path.join(self.expected_dir, f), delimiter=',').T
-            output_matrix = np.loadtxt(os.path.join(self.output_dir, f), delimiter=',')
+            expected_matrix = np.loadtxt(os.path.join(self.expected_dir, f), delimiter='\t', dtype=int).T
+            output_matrix = np.loadtxt(os.path.join(self.output_dir, f), delimiter=',', dtype=int)
             # Check if size matches
             self.assertEqual(expected_matrix.shape, output_matrix.shape, f"File {f} is not the same size in the output directory as in the expected directory.")
 
@@ -35,13 +35,13 @@ class CheckSequenceFiles(unittest.TestCase):
         """
         Compare the contents of all files from the expected directory whose name starts with 'allSeqAllAn_'
         """
-        expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'allSeqAllAn_', f)]
-        output_files = [f for f in os.listdir(self.output_dir) if re.match(r'allSeqAllAn_', f)]
+        expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'allSeqAllAn_', f) and (not f.startswith('.')) and not f.startswith('allSeqAllAn_0')]
+        output_files = [f for f in os.listdir(self.output_dir) if re.match(r'allSeqAllAn_', f) and (not f.startswith('.')) and not f.startswith('allSeqAllAn_0')]
         for f in expected_files:
             self.assertTrue(f in output_files, f"File {f} not found in output directory.")
             # Get the second column of each matrix
-            expected = list(np.loadtxt(os.path.join(self.expected_dir, f), delimiter=',')[:, 1])
-            output = list(np.loadtxt(os.path.join(self.output_dir, f), delimiter=',')[:, 1])
+            expected = list(np.loadtxt(os.path.join(self.expected_dir, f), delimiter='\t', dtype=int)[:, 1])
+            output = list(np.loadtxt(os.path.join(self.output_dir, f), delimiter=',', dtype=int)[:, 1])
 
             # Sort the lists and see if they match
             expected.sort()
@@ -75,15 +75,15 @@ class CheckSequenceFiles(unittest.TestCase):
         File names are the same
         """
         # Check if the sizes are the same
-        expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'seqCnts_', f)]
-        output_files = [f for f in os.listdir(self.output_dir) if re.match(r'seqCnts_', f)]
+        expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'seqCnts_', f) and not f.startswith('.')]
+        output_files = [f for f in os.listdir(self.output_dir) if re.match(r'seqCnts_', f) and not f.startswith('.')]
         total = 0
         correct = 0
         for f in expected_files:
             self.assertTrue(f in output_files, f"File {f} not found in output directory.")
             # Read the files using pandas
-            expected = pd.read_csv(os.path.join(self.expected_dir, f), delimiter=',')
-            output = pd.read_csv(os.path.join(self.output_dir, f), delimiter=',')
+            expected = pd.read_csv(os.path.join(self.expected_dir, f), delimiter=',', dtype=int)
+            output = pd.read_csv(os.path.join(self.output_dir, f), delimiter=',', dtype=int)
             # Check if the sizes are the same
             if expected.shape == output.shape:
                 correct += 1
@@ -104,7 +104,7 @@ class CheckSequenceFilesDeep(unittest.TestCase):
             """
             Takes a sequence number in the expected set and returns the corresponding sequence number in the output set
             """
-            expected_allSeq = np.atleast_2d(np.loadtxt(os.path.join(self.expected_dir, f'allSeq_{cont}_{length}.txt'), delimiter=',', dtype=int)).T
+            expected_allSeq = np.atleast_2d(np.loadtxt(os.path.join(self.expected_dir, f'allSeq_{cont}_{length}.txt'), delimiter='\t', dtype=int)).T
             expected_sequence = tuple(expected_allSeq[expected_seq_num])
             
             output_allSeq = np.atleast_2d(np.loadtxt(os.path.join(self.output_dir, f'allSeq_{cont}_{length}.txt'), delimiter=',', dtype=int))
@@ -177,9 +177,9 @@ class CheckSequenceFilesDeep(unittest.TestCase):
 
         def test_seqCnts_deep_all(self):
             """Same as the test_seqCnts_deep, but for all sequences"""
-            expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'seqCnts_', f)]
+            expected_files = [f for f in os.listdir(self.expected_dir) if re.match(r'seqCnts_', f) and (not f.startswith('.')) and not f.startswith('seqCnts_0')]
             expected_files = self.natural_sort(expected_files)
-            output_files = [f for f in os.listdir(self.output_dir) if re.match(r'seqCnts_', f)]
+            output_files = [f for f in os.listdir(self.output_dir) if re.match(r'seqCnts_', f) and (not f.startswith('.')) and not f.startswith('seqCnts_0')]
             overall_good = 0
             overall_checked = 0
             for f in expected_files:
@@ -189,7 +189,7 @@ class CheckSequenceFilesDeep(unittest.TestCase):
                 # Length is the number after the second _
                 length = int(f.split('_')[2].split('.')[0])
                 # Read the files using numpy. Set blank values to -1
-                expected = np.loadtxt(os.path.join(self.expected_dir, f), delimiter=',', dtype=str)
+                expected = np.loadtxt(os.path.join(self.expected_dir, f), delimiter='\t', dtype=str)
                 expected[expected == ''] = -1
                 # Convert the expected back into integers
                 expected = expected.astype(int)
@@ -223,7 +223,11 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
     # suite.addTest(CheckSequenceFiles('test_criterion_file'))
     # suite.addTest(CheckSequenceFilesDeep('test_seqCnts_deep'))
+
+    suite.addTest(CheckSequenceFiles('test_allSeq_files'))
+    suite.addTest(CheckSequenceFiles('test_allSeqAllAn_files'))
     suite.addTest(CheckSequenceFilesDeep('test_seqCnts_deep_all'))
+
     # suite.addTest(CheckSequenceFilesDeep('test_translate'))
     runner = unittest.TextTestRunner()
     runner.run(suite)

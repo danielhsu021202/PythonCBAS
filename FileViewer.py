@@ -1,5 +1,5 @@
 
-from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem
+from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem, QMenu
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QAbstractTableModel, Qt
 
@@ -9,6 +9,9 @@ import re
 import pandas as pd
 
 from ui.FileViewerWidget import Ui_FileViewer
+import os
+from PyQt6.QtWidgets import QMenu
+from PyQt6.QtCore import Qt
 
 class PandasTableModel(QAbstractTableModel): 
     def __init__(self, df=pd.DataFrame(), parent=None): 
@@ -70,10 +73,56 @@ class PandasTableModel(QAbstractTableModel):
         self.layoutChanged.emit()
 
 
+
+
 class PandasTable(QTableView):
     def __init__(self, data, parent=None):
-        super(PandasTable, self).__init__(parent)
-        self.df = data
+        super().__init__()
+        self.df: pd.DataFrame = data
+        self.parent = parent
+        self.model = PandasTableModel(self.df)
+        self.setModel(self.model)
+
+        self.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.horizontalHeader().customContextMenuRequested.connect(self.onHeaderContextMenuRequested)
+        self.verticalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.verticalHeader().customContextMenuRequested.connect(self.onHeaderContextMenuRequested)
+
+    def onHeaderContextMenuRequested(self, pos):
+        menu = QMenu()
+        sortAscendingAction = menu.addAction("Sort Ascending",)
+        sortDescendingAction = menu.addAction("Sort Descending")
+        action = menu.exec(self.mapToGlobal(pos))
+
+        if action == sortAscendingAction:
+            if self.sender() == self.horizontalHeader():
+                self.sortColumn(self.columnAt(pos.x()), True)
+            else:
+                self.sortRow(self.rowAt(pos.y()), True)
+
+        elif action == sortDescendingAction:
+            if self.sender() == self.horizontalHeader():
+                self.sortColumn(self.columnAt(pos.x()), False)
+            else:
+                self.sortRow(self.rowAt(pos.y()), False)
+
+    
+    def sortColumn(self, column, order):
+        self.df = self.df.sort_values(by=self.df.columns[column], axis=0, ascending=order)
+        self.updateTable()
+
+    def sortRow(self, row, order):
+        self.df = self.df.sort_values(by=self.df.index[row], axis=1, ascending=order)
+        self.updateTable()
+
+        
+
+            
+
+
+
+
+    def updateTable(self):
         self.model = PandasTableModel(self.df)
         self.setModel(self.model)
 
@@ -85,8 +134,11 @@ class FileViewer(QWidget, Ui_FileViewer):
     def __init__(self, parent=None):
         super(FileViewer, self).__init__(parent)
         self.setupUi(self)
+        self.setDefaultSizes()
 
         self.directories = set()
+        self.directories.add(os.path.join("output"))
+        self.refreshFileTree()
         self.df = None
 
         self.mapButtonActions()
@@ -95,7 +147,19 @@ class FileViewer(QWidget, Ui_FileViewer):
     def mapButtonActions(self):
         self.fileTreeImportButton.clicked.connect(self.importDirectory)
         self.refreshFileTreeButton.clicked.connect(self.refreshFileTree)
+        self.countRowsButton.clicked.connect(self.countRows)
+        self.countColumnsButton.clicked.connect(self.countColumns)
+        self.clearFunctionTerminalButton.clicked.connect(self.functionTerminal.clear)
 
+    def displayHeaderContextMenu(self, pos):
+        """Displays the context menu for the header.
+            Axis 0 is row, 1 is column."""
+        print("Requested")
+        menu = QMenu()
+        menu.addAction("Sort Ascending",)
+        menu.addAction("Sort Descending")
+        menu.exec(self.dataTable.mapToGlobal(pos))
+        
 
     def importDirectory(self):
         """Opens a file dialog to import a directory."""
@@ -111,7 +175,15 @@ class FileViewer(QWidget, Ui_FileViewer):
             if os.path.isdir(directory):
                 self.populateFileTree(directory, self.fileTree.invisibleRootItem())
             else:
-                self.directories.remove(directory)
+                pass
+
+    def countRows(self):
+        """Displays row count in the function terminal."""
+        self.functionTerminal.appendPlainText("Rows: " + str(len(self.df)) if self.df is not None else "No file selected.")
+
+    def countColumns(self):
+        """Displays column count in the function terminal."""
+        self.functionTerminal.appendPlainText("Columns: " + str(len(self.df.columns)) if self.df is not None else "No file selected.")
 
     def naturalSort(self, l):
         """Sorts a list of strings in natural order."""
@@ -142,12 +214,16 @@ class FileViewer(QWidget, Ui_FileViewer):
     def openFile(self, item):
         """Opens the file and displays it in the table view, replacing the current widget."""
         if item.childCount() == 0:
-            self.df = pd.read_csv(item.data(0, Qt.ItemDataRole.UserRole))
+            self.df = pd.read_csv(item.data(0, Qt.ItemDataRole.UserRole), header=None)
             self.df.columns = [str(i) for i in range(len(self.df.columns))]
-            pd_table = PandasTable(self.df)
+            pd_table = PandasTable(self.df, self)
             self.dataTableLayout.replaceWidget(self.dataTableLayout.itemAt(0).widget(), pd_table)
             self.fileNameLabel.setText(os.path.basename(item.data(0, Qt.ItemDataRole.UserRole)))
 
+
+    def setDefaultSizes(self):
+        # Set the default sizes of the splitter
+        self.mainSplitter.setSizes([300, 800, 200])
 
     
                 

@@ -33,6 +33,15 @@
     <property name="title">
      <string>Appearance</string>
     </property>
+    <widget class="QMenu" name="menuTheme">
+     <property name="title">
+      <string>Theme</string>
+     </property>
+     <addaction name="actionDark_Theme"/>
+     <addaction name="actionLight_Theme"/>
+     <addaction name="actionAuto"/>
+    </widget>
+    <addaction name="menuTheme"/>
    </widget>
    <addaction name="temporary_menu"/>
    <addaction name="menuAppearance"/>
@@ -41,6 +50,21 @@
   <action name="actionRun_CBAS">
    <property name="text">
     <string>Run CBAS</string>
+   </property>
+  </action>
+  <action name="actionDark_Theme">
+   <property name="text">
+    <string>Dark Theme</string>
+   </property>
+  </action>
+  <action name="actionLight_Theme">
+   <property name="text">
+    <string>Light Theme</string>
+   </property>
+  </action>
+  <action name="actionAuto">
+   <property name="text">
+    <string>Auto</string>
    </property>
   </action>
  </widget>

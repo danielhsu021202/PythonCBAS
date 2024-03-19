@@ -88,7 +88,6 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("PythonCBAS")
-
         
 
         self.setUpMenuBar()
@@ -101,27 +100,36 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.centralwidget.setLayout(layout)
 
         # Set size
-        self.resize(1200, 720)
+        self.resize(1600, 900)
 
 
-        
+    
 
     def setUpMenuBar(self):
         self.menubar = self.menuBar()
         self.menubar.setNativeMenuBar(False)  # For macOS
         self.actionRun_CBAS.triggered.connect(self.runCBAS)
+        self.actionDark_Theme.triggered.connect(lambda: qdarktheme.setup_theme("dark"))
+        self.actionLight_Theme.triggered.connect(lambda: qdarktheme.setup_theme("light"))
+        self.actionAuto.triggered.connect(lambda: qdarktheme.setup_theme("auto"))
 
     def runCBAS(self):
         startCBASTerminal()
 
 if __name__ == "__main__":
+    qdarktheme.enable_hi_dpi()
     app = QApplication(sys.argv)
+
+    # Load ui/styles.qss
+    with open("ui/styles.qss", "r") as f:
+        qss = f.read()
+
+    
+
+    qdarktheme.setup_theme("auto", additional_qss=qss)
 
 
     
-    # Set all widgets to light theme
-
-
     
     window = PythonCBAS()
     window.show()
