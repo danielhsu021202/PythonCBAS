@@ -92,6 +92,8 @@ class PandasTable(QTableView):
         menu = QMenu()
         sortAscendingAction = menu.addAction("Sort Ascending",)
         sortDescendingAction = menu.addAction("Sort Descending")
+        sumAction = menu.addAction("Sum")
+        averageAction = menu.addAction("Average")
         action = menu.exec(self.mapToGlobal(pos))
 
         if action == sortAscendingAction:
@@ -99,12 +101,25 @@ class PandasTable(QTableView):
                 self.sortColumn(self.columnAt(pos.x()), True)
             else:
                 self.sortRow(self.rowAt(pos.y()), True)
-
         elif action == sortDescendingAction:
             if self.sender() == self.horizontalHeader():
                 self.sortColumn(self.columnAt(pos.x()), False)
             else:
                 self.sortRow(self.rowAt(pos.y()), False)
+        elif action == sumAction:
+            if self.sender() == self.horizontalHeader():
+                col = self.columnAt(pos.x())
+                self.parent.functionTerminal.appendPlainText(f"Sum of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].sum())}")
+            else:
+                row = self.rowAt(pos.y())
+                self.parent.functionTerminal.appendPlainText(f"Sum of row {row}: {str(self.df.iloc[row].sum())}")
+        elif action == averageAction:
+            if self.sender() == self.horizontalHeader():
+                col = self.columnAt(pos.x())
+                self.parent.functionTerminal.appendPlainText(f"Average of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].mean())}")
+            else:
+                row = self.rowAt(pos.y())
+                self.parent.functionTerminal.appendPlainText(f"Average of row {row}: {str(self.df.iloc[row].mean())}")
 
     
     def sortColumn(self, column, order):
