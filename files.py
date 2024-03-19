@@ -51,10 +51,10 @@ class FileManager:
                 f.write(f"{cohort},{i}\n")
         return {cohort: i for i, cohort in enumerate(cohort_folders)}
 
-    def getMatrix(file):
+    def getMatrix(file, delimiter=','):
         """Takes a text file and returns a numpy matrix"""
         # Force it to be 2D even if there's only one row
-        return np.atleast_2d(np.genfromtxt(file, delimiter=',', dtype=int))
+        return np.atleast_2d(np.genfromtxt(file, delimiter=delimiter, dtype=int))
     
     def writeMatrix(file, mat):
         """Writes a numpy matrix to a text file. Don't write an extra line"""
@@ -79,7 +79,7 @@ class FileManager:
                                                          and name != self.FILES['INFO_FILE'] 
                                                          and not name.startswith('.')])
                 all_paths += [os.path.join(cohort_folder, file) for file in animal_files]
-                animal_info_matrix = FileManager.getMatrix(info_file)
+                animal_info_matrix = FileManager.getMatrix(info_file, delimiter='\t')
                 # Get rid of hidden files
                 animal_files = [file for file in animal_files if not file.startswith('.')]
                 assert len(animal_files) == len(animal_info_matrix)

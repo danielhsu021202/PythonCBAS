@@ -7,6 +7,7 @@ import os
 import sys
 import re
 import pandas as pd
+from statistics import median, mode
 
 from ui.FileViewerWidget import Ui_FileViewer
 import os
@@ -94,6 +95,9 @@ class PandasTable(QTableView):
         sortDescendingAction = menu.addAction("Sort Descending")
         sumAction = menu.addAction("Sum")
         averageAction = menu.addAction("Average")
+        medianAction = menu.addAction("Median")
+        modeAction = menu.addAction("Mode")
+        rangeAction = menu.addAction("Range")
         action = menu.exec(self.mapToGlobal(pos))
 
         if action == sortAscendingAction:
@@ -109,17 +113,46 @@ class PandasTable(QTableView):
         elif action == sumAction:
             if self.sender() == self.horizontalHeader():
                 col = self.columnAt(pos.x())
-                self.parent.functionTerminal.appendPlainText(f"Sum of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].sum())}")
+                self.writeToFuncTerminal(f"Sum of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].sum())}")
             else:
                 row = self.rowAt(pos.y())
-                self.parent.functionTerminal.appendPlainText(f"Sum of row {row}: {str(self.df.iloc[row].sum())}")
+                self.writeToFuncTerminal(f"Sum of row {row}: {str(self.df.iloc[row].sum())}")
         elif action == averageAction:
             if self.sender() == self.horizontalHeader():
                 col = self.columnAt(pos.x())
-                self.parent.functionTerminal.appendPlainText(f"Average of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].mean())}")
+                self.writeToFuncTerminal(f"Average of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].mean())}")
             else:
                 row = self.rowAt(pos.y())
-                self.parent.functionTerminal.appendPlainText(f"Average of row {row}: {str(self.df.iloc[row].mean())}")
+                self.writeToFuncTerminal(f"Average of row {row}: {str(self.df.iloc[row].mean())}")
+        elif action == medianAction:
+            if self.sender() == self.horizontalHeader():
+                col = self.columnAt(pos.x())
+                selected_column = list(self.df[self.df.columns[col]])
+                median_value = median(selected_column)
+                self.writeToFuncTerminal(f"Median of column {self.df.columns[col]}: {str(median_value)}")
+            else:
+                row = self.rowAt(pos.y())
+                selected_row = list(self.df.iloc[row])
+                median_value = median(selected_row)
+                self.writeToFuncTerminal(f"Median of row {row}: {str(median_value)}")
+        elif action == modeAction:
+            if self.sender() == self.horizontalHeader():
+                col = self.columnAt(pos.x())
+                selected_column = list(self.df[self.df.columns[col]])
+                mode_value = mode(selected_column)
+                self.writeToFuncTerminal(f"Mode of column {self.df.columns[col]}: {str(mode_value)}")
+            else:
+                row = self.rowAt(pos.y())
+                selected_row = list(self.df.iloc[row])
+                mode_value = mode(selected_row)
+                self.writeToFuncTerminal(f"Mode of row {row}: {str(mode_value)}")
+        elif action == rangeAction:
+            if self.sender() == self.horizontalHeader():
+                col = self.columnAt(pos.x())
+                self.writeToFuncTerminal(f"Range of column {self.df.columns[col]}: [{str(self.df[self.df.columns[col]].min())}, {str(self.df[self.df.columns[col]].max())}]")
+            else:
+                row = self.rowAt(pos.y())
+                self.writeToFuncTerminal(f"Range of row {row}: [{str(self.df.iloc[row].min())}, {str(self.df.iloc[row].max())}]")
 
     
     def sortColumn(self, column, order):
@@ -130,7 +163,8 @@ class PandasTable(QTableView):
         self.df = self.df.sort_values(by=self.df.index[row], axis=1, ascending=order)
         self.updateTable()
 
-        
+    def writeToFuncTerminal(self, text):
+        self.parent.functionTerminal.appendPlainText(text)
 
             
 
@@ -226,11 +260,23 @@ class FileViewer(QWidget, Ui_FileViewer):
                 file_item.setText(0, item)  # Set the text for the item
                 file_item.setData(0, Qt.ItemDataRole.UserRole, item_path)  # Set the data for the item
 
+    def fileType(self, filepath):
+        """Returns the file type of the file at the given path."""
+        filename = os.path.basename(filepath)
+        if filename == "animals.txt":
+            return "animals"
+        
+    def getColumnNames(self, filepath):
+        """Returns the column names of the file at the given path."""
+        if self.fileType(filepath) == "animals":
+            return ["Animal Number", "Cohort Number", "Animal Key", "Genotype", "Sex", "Lesion", "Implant"]
+        else: return [str(i) for i in range(len(self.df.columns))]
+
     def openFile(self, item):
         """Opens the file and displays it in the table view, replacing the current widget."""
         if item.childCount() == 0:
             self.df = pd.read_csv(item.data(0, Qt.ItemDataRole.UserRole), header=None)
-            self.df.columns = [str(i) for i in range(len(self.df.columns))]
+            self.df.columns = self.getColumnNames(item.data(0, Qt.ItemDataRole.UserRole))
             pd_table = PandasTable(self.df, self)
             self.dataTableLayout.replaceWidget(self.dataTableLayout.itemAt(0).widget(), pd_table)
             self.fileNameLabel.setText(os.path.basename(item.data(0, Qt.ItemDataRole.UserRole)))

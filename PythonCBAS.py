@@ -47,7 +47,7 @@ def startCBASTerminal():
     print("Retrieving settings...")
     settings = Settings()
     # settings.setCriterion({'ORDER': 0, 'NUMBER': float('inf'), 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
-    settings.setCriterion({'ORDER': 4, 'NUMBER': 100, 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
+    settings.setCriterion({'ORDER': 0, 'NUMBER': float('inf'), 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
     FILES = settings.getFiles()
     ANIMAL_FILE_FORMAT = settings.getAnimalFileFormat()
     LANGUAGE = settings.getLanguage()
@@ -94,10 +94,9 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
 
 
 
-        # Add the File Viewer Frame to the main window
-        layout = QVBoxLayout()
-        layout.addWidget(FileViewer())
-        self.centralwidget.setLayout(layout)
+        # Add the File Viewer Frame to the main staci
+        self.fileViewer = FileViewer()
+        self.FileViewerPage.layout().addWidget(self.fileViewer)
 
         # Set size
         self.resize(1600, 900)
@@ -108,16 +107,17 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
     def setUpMenuBar(self):
         self.menubar = self.menuBar()
         self.menubar.setNativeMenuBar(False)  # For macOS
-        self.actionRun_CBAS.triggered.connect(self.runCBAS)
+        self.actionGet_Sequences.triggered.connect(self.runCBAS)
         self.actionDark_Theme.triggered.connect(lambda: qdarktheme.setup_theme("dark"))
         self.actionLight_Theme.triggered.connect(lambda: qdarktheme.setup_theme("light"))
         self.actionAuto.triggered.connect(lambda: qdarktheme.setup_theme("auto"))
+        self.actionImport_Data.triggered.connect(lambda: self.mainStack.setCurrentIndex(0))
+        self.actionFile_Viewer.triggered.connect(lambda: self.mainStack.setCurrentIndex(1))
 
     def runCBAS(self):
         startCBASTerminal()
 
 if __name__ == "__main__":
-    qdarktheme.enable_hi_dpi()
     app = QApplication(sys.argv)
 
     # Load ui/styles.qss

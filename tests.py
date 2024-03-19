@@ -14,7 +14,7 @@ class CheckSequenceFiles(unittest.TestCase):
         settings = Settings()
         settings.setCriterion({'ORDER': 4, 'NUMBER': 100, 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
         self.files = settings.getFiles()
-        self.expected_dir = self.files['EXPECTED_OUTPUT']
+        self.expected_dir = os.path.join(self.files['EXPECTED_OUTPUT'], "zerothInf")
         self.output_dir = self.files['OUTPUT']
     
     def test_allSeq_files(self):
@@ -97,7 +97,7 @@ class CheckSequenceFilesDeep(unittest.TestCase):
         def setUp(self):
             settings = Settings()
             self.files = settings.getFiles()
-            self.expected_dir = self.files['EXPECTED_OUTPUT']
+            self.expected_dir = os.path.join(self.files['EXPECTED_OUTPUT'], "zerothInf")
             self.output_dir = self.files['OUTPUT']
 
         def translateExpectedToOutputSeqNum(self, cont, length, expected_seq_num):

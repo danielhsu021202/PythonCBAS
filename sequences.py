@@ -206,6 +206,10 @@ class SequencesProcessor:
         Returns whether the criterion has been reached (which means we've got our trial number).
             If True, then we can stop updating the sequence counts.
             If False, then we need to keep updating the sequence counts.
+
+        criterion matrix: 2D array with animal numbers as rows and contingencies as columns
+            Each entry is a tuple: (number accomplished, trial number of accomplishment)
+            SPECIAL CASE FOR ORDER 0: If the order is 0, then the first number is the total number of trials performed.
         """
         if new_trial_num is None:
             # If the trial number is None, then the animal did not participate in this contingency
@@ -214,7 +218,7 @@ class SequencesProcessor:
         if orderZero:
             # If we're working with order 0, then we're just registering the total number of trials performed
             self.criterion_matrix[self.current_animal_num][cont] = (min(new_trial_num, self.CRITERION['NUMBER']), self.CONSTANTS['NaN'])
-            return True
+            return new_trial_num >= self.CRITERION['NUMBER']
         else:
             num_accomplished, _ = self.criterion_matrix[self.current_animal_num][cont]    
             if num_accomplished == self.CRITERION['NUMBER']: 
@@ -253,12 +257,17 @@ class SequencesProcessor:
 
     def findCriterionTrial(self, cont: int):
         num_accomplished, trial_num = self.criterion_matrix[self.current_animal_num][cont]
-        if num_accomplished == self.CONSTANTS['NaN']:
-            return self.CONSTANTS['NaN']
-        elif num_accomplished < self.CRITERION['NUMBER']:
-            return float('inf')
+        if self.CRITERION['ORDER'] == 0:
+            if num_accomplished == self.CONSTANTS['NaN']:
+                return self.CONSTANTS['NaN']
+            return self.CRITERION['NUMBER']
         else:
-            return trial_num
+            if num_accomplished == self.CONSTANTS['NaN']:
+                return self.CONSTANTS['NaN']
+            elif num_accomplished < self.CRITERION['NUMBER']:
+                return float('inf')
+            else:
+                return trial_num
 
 
     def updateSequenceCounts(self, length: int, cont: int, seq_num: int, increment: bool):
@@ -365,7 +374,6 @@ class SequencesProcessor:
                         # num_accomplished = self.criterion_matrix[self.current_animal_num][cont][0]
                         # if num_accomplished <= self.CRITERION['NUMBER']:
                         #     num_accomplished = float('inf')
-                        #TODO: it's not trial... it's number accomplished. Keep track of this similarly to criterion matrix and post process too.
                         self.updateSequenceCounts(length, cont, seq_num, trial <= self.findCriterionTrial(cont))
 
                     trial += 1

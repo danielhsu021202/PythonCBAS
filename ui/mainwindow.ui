@@ -13,7 +13,43 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
-  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QGridLayout" name="gridLayout">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item row="0" column="0">
+     <widget class="QStackedWidget" name="mainStack">
+      <property name="currentIndex">
+       <number>1</number>
+      </property>
+      <widget class="QWidget" name="ImportDataPage">
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Import Data</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="FileViewerPage">
+       <layout class="QVBoxLayout" name="verticalLayout"/>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
@@ -27,7 +63,8 @@
     <property name="title">
      <string>Temporary Running</string>
     </property>
-    <addaction name="actionRun_CBAS"/>
+    <addaction name="actionGet_Sequences"/>
+    <addaction name="actionGenerate_Groups"/>
    </widget>
    <widget class="QMenu" name="menuAppearance">
     <property name="title">
@@ -43,13 +80,22 @@
     </widget>
     <addaction name="menuTheme"/>
    </widget>
+   <widget class="QMenu" name="menuPage">
+    <property name="title">
+     <string>Page</string>
+    </property>
+    <addaction name="separator"/>
+    <addaction name="actionImport_Data"/>
+    <addaction name="actionFile_Viewer"/>
+   </widget>
    <addaction name="temporary_menu"/>
    <addaction name="menuAppearance"/>
+   <addaction name="menuPage"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionRun_CBAS">
+  <action name="actionGet_Sequences">
    <property name="text">
-    <string>Run CBAS</string>
+    <string>Get Sequences</string>
    </property>
   </action>
   <action name="actionDark_Theme">
@@ -65,6 +111,21 @@
   <action name="actionAuto">
    <property name="text">
     <string>Auto</string>
+   </property>
+  </action>
+  <action name="actionImport_Data">
+   <property name="text">
+    <string>Import Data</string>
+   </property>
+  </action>
+  <action name="actionFile_Viewer">
+   <property name="text">
+    <string>File Viewer</string>
+   </property>
+  </action>
+  <action name="actionGenerate_Groups">
+   <property name="text">
+    <string>Generate Groups</string>
    </property>
   </action>
  </widget>
