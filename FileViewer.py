@@ -166,12 +166,11 @@ class PandasTable(QTableView):
     def writeToFuncTerminal(self, text):
         self.parent.functionTerminal.appendPlainText(text)
 
-            
 
-
-
-
-    def updateTable(self):
+    
+    def updateTable(self, df=None):
+        if df is not None:
+            self.df = df
         self.model = PandasTableModel(self.df)
         self.setModel(self.model)
 
@@ -189,6 +188,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.directories.add(os.path.join("output"))
         self.refreshFileTree()
         self.df = None
+        self.pd_table = None
 
         self.mapButtonActions()
         self.fileTree.itemDoubleClicked.connect(self.openFile)
@@ -198,6 +198,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.refreshFileTreeButton.clicked.connect(self.refreshFileTree)
         self.countRowsButton.clicked.connect(self.countRows)
         self.countColumnsButton.clicked.connect(self.countColumns)
+        self.transposeButton.clicked.connect(self.transpose)
         self.clearFunctionTerminalButton.clicked.connect(self.functionTerminal.clear)
 
     def displayHeaderContextMenu(self, pos):
@@ -233,6 +234,11 @@ class FileViewer(QWidget, Ui_FileViewer):
     def countColumns(self):
         """Displays column count in the function terminal."""
         self.functionTerminal.appendPlainText("Columns: " + str(len(self.df.columns)) if self.df is not None else "No file selected.")
+
+    def transpose(self):
+        """Transposes the table."""
+        self.df = self.df.transpose()
+        self.pd_table.updateTable(self.df)
 
     def naturalSort(self, l):
         """Sorts a list of strings in natural order."""
@@ -277,8 +283,8 @@ class FileViewer(QWidget, Ui_FileViewer):
         if item.childCount() == 0:
             self.df = pd.read_csv(item.data(0, Qt.ItemDataRole.UserRole), header=None)
             self.df.columns = self.getColumnNames(item.data(0, Qt.ItemDataRole.UserRole))
-            pd_table = PandasTable(self.df, self)
-            self.dataTableLayout.replaceWidget(self.dataTableLayout.itemAt(0).widget(), pd_table)
+            self.pd_table = PandasTable(self.df, self)
+            self.dataTableLayout.replaceWidget(self.dataTableLayout.itemAt(0).widget(), self.pd_table)
             self.fileNameLabel.setText(os.path.basename(item.data(0, Qt.ItemDataRole.UserRole)))
 
 

@@ -7,6 +7,7 @@ import os
 import time
 import numpy as np
 import re
+import argparse
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QTreeWidgetItemIterator
 from PyQt6.QtGui import QPalette, QColor
@@ -47,7 +48,7 @@ def startCBASTerminal():
     print("Retrieving settings...")
     settings = Settings()
     # settings.setCriterion({'ORDER': 0, 'NUMBER': float('inf'), 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
-    settings.setCriterion({'ORDER': 0, 'NUMBER': float('inf'), 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
+    settings.setCriterion({'ORDER': 4, 'NUMBER': 100, 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
     FILES = settings.getFiles()
     ANIMAL_FILE_FORMAT = settings.getAnimalFileFormat()
     LANGUAGE = settings.getLanguage()
@@ -68,16 +69,29 @@ def startCBASTerminal():
 
     print(divider)
     section_start = time.time()
+    print("Grouping animals...")
+    groups = settings.assignGroups([{"GENOTYPE": 0, "LESION": 0}, {"GENOTYPE": 1, "LESION": 0}])
+    print("Animals grouped. Time taken: ", format_time(time.time() - section_start))
+
+    print(divider)
+    section_start = time.time()
     print("Processing sequences and calculating criterion...")
     sequencesProcessor = SequencesProcessor(FILES, ANIMAL_FILE_FORMAT, LANGUAGE, CRITERION, CONSTANTS)
-    sequencesProcessor.processAllAnimals()
+    sequence_matrix = sequencesProcessor.processAllAnimals()
     print("Sequences and criterion processed. Time taken: ", format_time(time.time() - section_start))
+
+    print(divider)
+    section_start = time.time()
+    print("Calculating sequence rates...")
+    sequencesProcessor.getSequenceRates(groups)
 
     print(divider)
     section_start = time.time()
     print("Generating sequence and criterion files...")
     sequencesProcessor.generateSequenceFiles()
     print("Sequence and criterion files generated. Time taken: ", format_time(time.time() - section_start))
+
+    
 
     print(divider)
     print(f"Total Time: {format_time(time.time() - start)}")
@@ -118,19 +132,28 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         startCBASTerminal()
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    parser = argparse.ArgumentParser(description="PythonCBAS")
+    parser.add_argument("-s", "--sequence", help="Run sequencing in terminal mode", action="store_true")
+    args = parser.parse_args()
 
-    # Load ui/styles.qss
-    with open("ui/styles.qss", "r") as f:
-        qss = f.read()
+    if args.sequence:
+        if args.sequence:
+            startCBASTerminal()
+        sys.exit()
+    else:
+        app = QApplication(sys.argv)
 
-    
+        # Load ui/styles.qss
+        with open("ui/styles.qss", "r") as f:
+            qss = f.read()
 
-    qdarktheme.setup_theme("auto", additional_qss=qss)
+        
+
+        qdarktheme.setup_theme("auto", additional_qss=qss)
 
 
-    
-    
-    window = PythonCBAS()
-    window.show()
-    sys.exit(app.exec())
+        
+        
+        window = PythonCBAS()
+        window.show()
+        sys.exit(app.exec())

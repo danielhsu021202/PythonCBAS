@@ -13,40 +13,10 @@ from colorama import Fore
 import time
 
 
-from collections import defaultdict
 from random import randint
 
 from files import FileManager
 
-count_4_0 = 0
-
-
-class ElementFrequencyCounter:
-    """Default dict that counts the frequency of each element pushed into it. Can retrieve the elements in sorted order."""
-    def __init__(self):
-        self.counter = defaultdict(int)
-
-    def push(self, item):
-        """Push the item to the dict and increment its count. If the item is not in the dict, it will be added."""
-        self.counter[item] += 1
-
-    def get_sorted_elements(self):
-        sorted_elements = sorted(self.counter, key=lambda x: self.counter[x], reverse=True)
-        return sorted_elements
-    
-    def merge(self, other_counter):
-        self.counter.update(other_counter.counter)
-
-    def merge_counters(counters):
-        """
-        Merges multiple counters into a single counter.
-        """
-        merged_counter = ElementFrequencyCounter()
-
-        for counter in counters:
-            merged_counter.merge(counter)
-
-        return merged_counter
 
 
 class SequenceManager:
@@ -182,6 +152,7 @@ class SequencesProcessor:
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
         self.sequence_matrix = [[SequenceManager(cont, seq_len+1) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
         self.criterion_matrix = None  # This is initialized in the processAllAnimals() function
+        self.seq_rates_df = None  # This is initialized in the getSequenceRates() function
         self.current_animal_num = self.CONSTANTS['NaN']
         self.total_animals = self.CONSTANTS['NaN']
 
@@ -192,6 +163,9 @@ class SequencesProcessor:
         Given a contingency and a length, return the SequenceManager object corresponding to that contingency and length.
         """
         return self.sequence_matrix[length-1][cont]
+    
+    def getSequenceMatrix(self):
+        return self.sequence_matrix
 
     def registerToSeqMatrix(self, sequence: tuple, length: int, cont: int, trial_num: int) -> int:
         """
@@ -354,7 +328,6 @@ class SequencesProcessor:
         This gets run num_contingencies * MAX_SEQUENCE_LENGTH times per animal.
         """
         
-        
         if not self.LANGUAGE['STRADDLE_SESSIONS']:
             trial = 0  # We uniquely identify sequences by their the first trial of occurence
             while trial <= len(mat) - length:
@@ -386,14 +359,56 @@ class SequencesProcessor:
             for i in np.arange(len(mat) - length):
                 sequence = tuple(mat[i:i+length, self.COLUMNS['CHOICE_COL']])
                 self.registerToSeqMatrix(sequence, length, cont)
-
-    def getSubmatrix(self, mat, col, val):
-        """
-        Returns the submatrix of mat where the column col is equal to val.
-        """
-        return mat[mat[:, col] == val]
     
-   
+    def getSequenceRates(self, groups: list[np.array]):
+        """
+        Given a list of groups of sequences, returns the sequence rates for each group.
+        The columns are:
+            Group 1 Averages ... Group n Averages, Original Sequence Number, Length, Contingency
+        The rows are sequences, regardless of length and contingency.
+        """
+        seq_num_col_name = "Original Seq No."
+        self.seq_rates_df = pd.DataFrame()
+        for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+            for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
+                seq_manager: SequenceManager = self.sequence_matrix[length][cont]
+                one_cont_one_length_df = pd.DataFrame()
+                seq_cnts = pd.DataFrame(seq_manager.getSeqCounts())
+                for i, group in enumerate(groups):
+                    seq_cnts_g = seq_cnts.iloc[group]  # Keep only the animals (rows) that are in the group
+                    seq_cnts_g = seq_cnts_g.loc[~(seq_cnts_g == self.CONSTANTS['NaN']).any(axis=1)]  # Remove animals (rows) with -1 (NaN) in the sequence counts
+                    seq_cnts_g = seq_cnts_g.T  # Transpose so that sequences are rows and animals are columns
+                    seq_cnts_g = seq_cnts_g.mean(axis=1)  # Average the sequence counts (each row) for each sequence
+                    seq_cnts_g = seq_cnts_g.reset_index()
+                    seq_cnts_g.columns = [seq_num_col_name, f'Group {i+1} Avg']
+
+                
+                    # Combine the dataframes from each group
+                    if one_cont_one_length_df.empty:
+                        one_cont_one_length_df = seq_cnts_g
+
+                    else:
+                        one_cont_one_length_df = pd.merge(one_cont_one_length_df, seq_cnts_g, on=seq_num_col_name)
+                
+                # Add the contingency and length columns
+                one_cont_one_length_df['Contingency'] = cont
+                one_cont_one_length_df['Length'] = length + 1
+
+                # Vertical stack the new dataframe to the sequence rates dataframe
+                if self.seq_rates_df.empty:
+                    self.seq_rates_df = one_cont_one_length_df
+                else:
+                    self.seq_rates_df = pd.concat([self.seq_rates_df, one_cont_one_length_df], axis=0)
+                
+
+                    
+
+
+
+
+
+        
+
 
 
     
@@ -427,6 +442,8 @@ class SequencesProcessor:
             for seq_manager in col:
                 seq_manager.setParticipationSeqCnts(self.missing_contingencies[missing_cont], self.CONSTANTS['NaN'])
 
+        return self.sequence_matrix
+
     def generateSequenceFiles(self):
         """
         ONE OF MAIN CALLED FUNCTION FOR THIS MODULE
@@ -439,16 +456,18 @@ class SequencesProcessor:
                 self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES, cont, length+1)
                 self.sequence_matrix[length][cont].genSeqCntsFile(self.FILES, cont, length+1)
         
-        # self.postProcessCriterionMatrix()
+        # Write the criterion matrix to a file
         FileManager.writeMatrix(os.path.join(self.FILES['OUTPUT'], 
                                              f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.txt'), 
                                 self.criterion_matrix)
+        # Write the sequence rates matrix to a file
+        self.seq_rates_df.to_csv(os.path.join(self.FILES['OUTPUT'],
+                                                f'seqRates_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.csv'), 
+                                    index=False)
 
-    def generateSequenceCountsFiles(self):
-        """
-        Generates the sequenceCounts file for each sequence length and contingency.
-        """
-        pass
+
+    
+        
 
 
     

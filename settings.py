@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 
 class Settings:
     def __init__(self):
@@ -27,6 +28,14 @@ class Settings:
             'COHORTS_FILE': os.path.join('metadata', 'cohorts.txt'),
             'ANIMALS_FILE': os.path.join('metadata', 'animals.txt'),
             'INFO_FILE': 'anInfo.txt',
+        }
+
+        self.animal_info_format = {
+            'ANKEY': 0,
+            'GENOTYPE': 1,
+            'SEX': 2,
+            'LESION': 3,
+            'IMPLANT': 4,
         }
         
         self.animal_file_format = {
@@ -68,6 +77,9 @@ class Settings:
 
     def getCatalogue(self):
         return self.catalogue 
+    
+    def getAnInfoCol(self, col_name):
+        return self.animal_info_format[col_name]
 
 
     
@@ -81,6 +93,21 @@ class Settings:
         """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
         assert attr_dict.keys() == self.criterion.keys()
         self.criterion = attr_dict
+
+    def assignGroups(self, groups: list[dict]):
+        """Assigns animals to groups based on the filters provided."""
+        animal_matrix = pd.read_csv(self.files['ANIMALS_FILE'], header=None)
+        an_nums = []
+        for group in groups:
+            animal_matrix_copy = animal_matrix.copy()
+            # Each element in the group is a filter
+            for col_name, value in group.items():
+                col_num = self.animal_info_format[col_name] + 2  # +2 because the first two columns are animal number and cohort number
+                animal_matrix_copy = animal_matrix_copy[animal_matrix_copy[col_num] == value]
+            an_nums.append(list(animal_matrix_copy[0]))
+        return an_nums
+
+            
 
     # def setCriterion(self, order: int, number: int, include_failed: bool, allow_redemption: bool):
     #     """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
