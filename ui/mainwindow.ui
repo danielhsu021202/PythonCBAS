@@ -30,21 +30,16 @@
     <item row="0" column="0">
      <widget class="QStackedWidget" name="mainStack">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="ImportDataPage">
-       <layout class="QVBoxLayout" name="verticalLayout_2">
-        <item>
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Import Data</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
+       <layout class="QVBoxLayout" name="verticalLayout_2"/>
       </widget>
       <widget class="QWidget" name="FileViewerPage">
        <layout class="QVBoxLayout" name="verticalLayout"/>
+      </widget>
+      <widget class="QWidget" name="CBASSettingsPage">
+       <layout class="QVBoxLayout" name="verticalLayout_3"/>
       </widget>
      </widget>
     </item>
@@ -66,20 +61,6 @@
     <addaction name="actionGet_Sequences"/>
     <addaction name="actionGenerate_Groups"/>
    </widget>
-   <widget class="QMenu" name="menuAppearance">
-    <property name="title">
-     <string>Appearance</string>
-    </property>
-    <widget class="QMenu" name="menuTheme">
-     <property name="title">
-      <string>Theme</string>
-     </property>
-     <addaction name="actionDark_Theme"/>
-     <addaction name="actionLight_Theme"/>
-     <addaction name="actionAuto"/>
-    </widget>
-    <addaction name="menuTheme"/>
-   </widget>
    <widget class="QMenu" name="menuPage">
     <property name="title">
      <string>Page</string>
@@ -88,9 +69,34 @@
     <addaction name="actionImport_Data"/>
     <addaction name="actionFile_Viewer"/>
    </widget>
+   <widget class="QMenu" name="menuPreferences">
+    <property name="title">
+     <string>Preferences</string>
+    </property>
+    <widget class="QMenu" name="menuAppearance">
+     <property name="title">
+      <string>Appearance</string>
+     </property>
+     <widget class="QMenu" name="menuTheme">
+      <property name="title">
+       <string>Theme</string>
+      </property>
+      <addaction name="actionDarkTheme"/>
+      <addaction name="actionLightTheme"/>
+      <addaction name="actionAutoTheme"/>
+     </widget>
+     <addaction name="menuTheme"/>
+     <addaction name="actionFont_Size"/>
+    </widget>
+    <addaction name="actionReset_Default"/>
+    <addaction name="actionImport_Config"/>
+    <addaction name="actionExport_Preferences"/>
+    <addaction name="separator"/>
+    <addaction name="menuAppearance"/>
+   </widget>
    <addaction name="temporary_menu"/>
-   <addaction name="menuAppearance"/>
    <addaction name="menuPage"/>
+   <addaction name="menuPreferences"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionGet_Sequences">
@@ -126,6 +132,50 @@
   <action name="actionGenerate_Groups">
    <property name="text">
     <string>Generate Groups</string>
+   </property>
+  </action>
+  <action name="actionReset_Default">
+   <property name="text">
+    <string>Reset Default</string>
+   </property>
+  </action>
+  <action name="actionImport_Config">
+   <property name="text">
+    <string>Import Preferences</string>
+   </property>
+  </action>
+  <action name="actionExport_Preferences">
+   <property name="text">
+    <string>Export Preferences</string>
+   </property>
+  </action>
+  <action name="actionDarkTheme">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Dark Theme</string>
+   </property>
+  </action>
+  <action name="actionLightTheme">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Light Theme</string>
+   </property>
+  </action>
+  <action name="actionAutoTheme">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Auto</string>
+   </property>
+  </action>
+  <action name="actionFont_Size">
+   <property name="text">
+    <string>Font Size</string>
    </property>
   </action>
  </widget>

@@ -122,9 +122,9 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.menubar = self.menuBar()
         self.menubar.setNativeMenuBar(False)  # For macOS
         self.actionGet_Sequences.triggered.connect(self.runCBAS)
-        self.actionDark_Theme.triggered.connect(lambda: qdarktheme.setup_theme("dark"))
-        self.actionLight_Theme.triggered.connect(lambda: qdarktheme.setup_theme("light"))
-        self.actionAuto.triggered.connect(lambda: qdarktheme.setup_theme("auto"))
+        self.actionDarkTheme.triggered.connect(lambda: qdarktheme.setup_theme("dark"))
+        self.actionLightTheme.triggered.connect(lambda: qdarktheme.setup_theme("light"))
+        self.actionAutoTheme.triggered.connect(lambda: qdarktheme.setup_theme("auto"))
         self.actionImport_Data.triggered.connect(lambda: self.mainStack.setCurrentIndex(0))
         self.actionFile_Viewer.triggered.connect(lambda: self.mainStack.setCurrentIndex(1))
 

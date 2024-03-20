@@ -81,6 +81,9 @@
           </property>
           <item>
            <widget class="QPushButton" name="refreshFileTreeButton">
+            <property name="toolTip">
+             <string>Refresh files to reflect changes in local file explorer</string>
+            </property>
             <property name="text">
              <string>Refresh</string>
             </property>
@@ -88,6 +91,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="fileTreeImportButton">
+            <property name="toolTip">
+             <string>Import Files</string>
+            </property>
             <property name="text">
              <string>Import</string>
             </property>
@@ -170,6 +176,9 @@
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
           <widget class="QPushButton" name="exportButton">
+           <property name="toolTip">
+            <string>Export Table View</string>
+           </property>
            <property name="text">
             <string>Export</string>
            </property>
@@ -191,11 +200,14 @@
        <item>
         <widget class="QGroupBox" name="actionsBox">
          <property name="title">
-          <string>Actions</string>
+          <string>Table Actions</string>
          </property>
          <layout class="QGridLayout" name="gridLayout_4">
           <item row="0" column="0">
            <widget class="QPushButton" name="countRowsButton">
+            <property name="toolTip">
+             <string>Get the number of rows in the table.</string>
+            </property>
             <property name="text">
              <string>Sum Rows</string>
             </property>
@@ -203,6 +215,9 @@
           </item>
           <item row="0" column="1">
            <widget class="QPushButton" name="countColumnsButton">
+            <property name="toolTip">
+             <string>Get the number of rows in the table.</string>
+            </property>
             <property name="text">
              <string>Sum Columns</string>
             </property>
@@ -210,6 +225,9 @@
           </item>
           <item row="1" column="0">
            <widget class="QPushButton" name="transposeButton">
+            <property name="toolTip">
+             <string>Transpose the table.</string>
+            </property>
             <property name="text">
              <string>Transpose</string>
             </property>
@@ -220,6 +238,9 @@
        </item>
        <item>
         <widget class="QGroupBox" name="groupBox_2">
+         <property name="toolTip">
+          <string>Output on queried information from the table</string>
+         </property>
          <property name="title">
           <string>Info Output</string>
          </property>
@@ -236,6 +257,9 @@
        </item>
        <item>
         <widget class="QGroupBox" name="groupBox">
+         <property name="toolTip">
+          <string>Output of table or analysis actions performed on the table</string>
+         </property>
          <property name="title">
           <string>Function Output</string>
          </property>
@@ -249,6 +273,9 @@
           </item>
           <item row="1" column="0">
            <widget class="QPushButton" name="clearFunctionTerminalButton">
+            <property name="toolTip">
+             <string>Clear the function output</string>
+            </property>
             <property name="text">
              <string>Clear</string>
             </property>
