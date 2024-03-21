@@ -184,8 +184,8 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.setupUi(self)
         self.setDefaultSizes()
 
-        self.directories = set()
-        self.directories.add(os.path.join("output"))
+        self.directories = set([os.path.join("output"), os.path.join("metadata")])
+        
         self.refreshFileTree()
         self.df = None
         self.pd_table = None

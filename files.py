@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import re
 import numpy as np
 import time
@@ -120,15 +121,21 @@ class FileManager:
         Sets up the output and metadata folders and ensures they all exist.
         Then processes the cohort and animal information and writes it to the metadata files.
         """
-        if not os.path.exists(self.FILES['OUTPUT']):
-            os.makedirs(self.FILES['OUTPUT'])
-        if not os.path.exists(self.FILES['METADATA']):
-            os.makedirs(self.FILES['METADATA'])
-
-        self.clearMetadata()
         # Clear output directory
-        for file in os.listdir(self.FILES['OUTPUT']):
-            os.remove(os.path.join(self.FILES['OUTPUT'], file))
+        if not os.path.exists(self.FILES['OUTPUT']):
+            os.rmdir(self.FILES['OUTPUT'])
+        if not os.path.exists(self.FILES['METADATA']):
+            os.rmdir(self.FILES['METADATA'])
+
+        Path(self.FILES['METADATA']).mkdir(parents=True, exist_ok=True)
+        self.clearMetadata()
+
+        Path(self.FILES['OUTPUT']).mkdir(parents=True, exist_ok=True)
+        Path(self.FILES['ALLSEQDIR']).mkdir(parents=True, exist_ok=True)
+        Path(self.FILES['ALLSEQALLANDIR']).mkdir(parents=True, exist_ok=True)
+        Path(self.FILES['SEQCNTSDIR']).mkdir(parents=True, exist_ok=True)
+        
+
 
         cohort_dict = self.buildCohortInfo()
         self.buildAnimalInfo(cohort_dict)

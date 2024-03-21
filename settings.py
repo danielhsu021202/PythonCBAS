@@ -23,6 +23,9 @@ class Settings:
         self.files = {
             'DATA': 'Data/scn2aDataSwapped/',
             'OUTPUT': 'output/',
+            'ALLSEQDIR': os.path.join('output', 'All Seq'),
+            'ALLSEQALLANDIR': os.path.join('output', 'All Seq All An'),
+            'SEQCNTSDIR': os.path.join('output', 'Sequence Counts'),
             'METADATA': 'metadata/',
             'EXPECTED_OUTPUT': 'expected_output_scn2a/',
             'COHORTS_FILE': os.path.join('metadata', 'cohorts.txt'),
@@ -69,6 +72,9 @@ class Settings:
     def getAnimalFileFormat(self):
         return self.animal_file_format
     
+    def getAnimalInfoFormat(self):
+        return self.animal_info_format
+    
     def getCriterion(self):
         return self.criterion
     
@@ -94,18 +100,7 @@ class Settings:
         assert attr_dict.keys() == self.criterion.keys()
         self.criterion = attr_dict
 
-    def assignGroups(self, groups: list[dict]):
-        """Assigns animals to groups based on the filters provided."""
-        animal_matrix = pd.read_csv(self.files['ANIMALS_FILE'], header=None)
-        an_nums = []
-        for group in groups:
-            animal_matrix_copy = animal_matrix.copy()
-            # Each element in the group is a filter
-            for col_name, value in group.items():
-                col_num = self.animal_info_format[col_name] + 2  # +2 because the first two columns are animal number and cohort number
-                animal_matrix_copy = animal_matrix_copy[animal_matrix_copy[col_num] == value]
-            an_nums.append(list(animal_matrix_copy[0]))
-        return an_nums
+    
 
             
 

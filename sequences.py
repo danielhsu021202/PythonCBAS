@@ -16,6 +16,7 @@ import time
 from random import randint
 
 from files import FileManager
+from settings import Settings
 
 
 
@@ -111,7 +112,7 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
-        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeq_{cont}_{seq_len}.txt'), mat)
+        FileManager.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
     
     def genAllSeqAllAnFile(self, FILES, cont, seq_len):
         """
@@ -119,13 +120,13 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array(self.animal_trials)
-        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
+        FileManager.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
 
     def genSeqCntsFile(self, FILES, cont, seq_len):
         """
         Generate the seqCnts file for this sequence length and contingency.
         """
-        FileManager.writeMatrix(os.path.join(FILES['OUTPUT'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
+        FileManager.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
     
     def numUniqueSeqs(self):
         """Returns the largest sequence number registered."""
@@ -142,12 +143,13 @@ class SequenceManager:
         
 
 class SequencesProcessor:
-    def __init__(self, FILES, ANIMAL_FILE_FORMAT, LANGUAGE, CRITERION, CONSTANTS):
-        self.FILES = FILES
-        self.COLUMNS = ANIMAL_FILE_FORMAT
-        self.LANGUAGE = LANGUAGE
-        self.CRITERION = CRITERION
-        self.CONSTANTS = CONSTANTS
+    def __init__(self, settings:Settings):
+        # Import Settings
+        self.FILES = settings.getFiles()
+        self.COLUMNS = settings.getAnimalFileFormat()
+        self.LANGUAGE = settings.getLanguage()
+        self.CRITERION = settings.getCriterion()
+        self.CONSTANTS = settings.getConstants()
 
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
         self.sequence_matrix = [[SequenceManager(cont, seq_len+1) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
@@ -230,6 +232,9 @@ class SequencesProcessor:
                     self.criterion_matrix[self.current_animal_num][cont] = trial_num
 
     def findCriterionTrial(self, cont: int):
+        """
+        Effectively post processes the criterion matrix to find the trial number of the criterion for the current animal and contingency.
+        """
         num_accomplished, trial_num = self.criterion_matrix[self.current_animal_num][cont]
         if self.CRITERION['ORDER'] == 0:
             if num_accomplished == self.CONSTANTS['NaN']:
@@ -249,8 +254,6 @@ class SequencesProcessor:
         Increment the sequence counts for this sequence length and contingency.
         If increment is False, we are just registering the sequence number and animal number to the sequence counts matrix, so no incrementing needed.
         """
-        
-
         self.sequence_matrix[length-1][cont].updateSeqCnt(seq_num, self.current_animal_num, increment)
 
     def registerMissingContingency(self, cont: int):
@@ -327,7 +330,6 @@ class SequencesProcessor:
         Increments the sequence counts matrix while we are on trial up to and including the criterion trial.
         This gets run num_contingencies * MAX_SEQUENCE_LENGTH times per animal.
         """
-        
         if not self.LANGUAGE['STRADDLE_SESSIONS']:
             trial = 0  # We uniquely identify sequences by their the first trial of occurence
             while trial <= len(mat) - length:
@@ -344,9 +346,6 @@ class SequencesProcessor:
                         self.updateSequenceCounts(length, cont, seq_num, not criterion_reached)
                     else:
                         # Otherwise, the criterion has already been processed and we can now use the criterion trial number to update the sequence counts
-                        # num_accomplished = self.criterion_matrix[self.current_animal_num][cont][0]
-                        # if num_accomplished <= self.CRITERION['NUMBER']:
-                        #     num_accomplished = float('inf')
                         self.updateSequenceCounts(length, cont, seq_num, trial <= self.findCriterionTrial(cont))
 
                     trial += 1
@@ -360,57 +359,6 @@ class SequencesProcessor:
                 sequence = tuple(mat[i:i+length, self.COLUMNS['CHOICE_COL']])
                 self.registerToSeqMatrix(sequence, length, cont)
     
-    def getSequenceRates(self, groups: list[np.array]):
-        """
-        Given a list of groups of sequences, returns the sequence rates for each group.
-        The columns are:
-            Group 1 Averages ... Group n Averages, Original Sequence Number, Length, Contingency
-        The rows are sequences, regardless of length and contingency.
-        """
-        seq_num_col_name = "Original Seq No."
-        self.seq_rates_df = pd.DataFrame()
-        for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
-            for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
-                seq_manager: SequenceManager = self.sequence_matrix[length][cont]
-                one_cont_one_length_df = pd.DataFrame()
-                seq_cnts = pd.DataFrame(seq_manager.getSeqCounts())
-                for i, group in enumerate(groups):
-                    seq_cnts_g = seq_cnts.iloc[group]  # Keep only the animals (rows) that are in the group
-                    seq_cnts_g = seq_cnts_g.loc[~(seq_cnts_g == self.CONSTANTS['NaN']).any(axis=1)]  # Remove animals (rows) with -1 (NaN) in the sequence counts
-                    seq_cnts_g = seq_cnts_g.T  # Transpose so that sequences are rows and animals are columns
-                    seq_cnts_g = seq_cnts_g.mean(axis=1)  # Average the sequence counts (each row) for each sequence
-                    seq_cnts_g = seq_cnts_g.reset_index()
-                    seq_cnts_g.columns = [seq_num_col_name, f'Group {i+1} Avg']
-
-                
-                    # Combine the dataframes from each group
-                    if one_cont_one_length_df.empty:
-                        one_cont_one_length_df = seq_cnts_g
-
-                    else:
-                        one_cont_one_length_df = pd.merge(one_cont_one_length_df, seq_cnts_g, on=seq_num_col_name)
-                
-                # Add the contingency and length columns
-                one_cont_one_length_df['Contingency'] = cont
-                one_cont_one_length_df['Length'] = length + 1
-
-                # Vertical stack the new dataframe to the sequence rates dataframe
-                if self.seq_rates_df.empty:
-                    self.seq_rates_df = one_cont_one_length_df
-                else:
-                    self.seq_rates_df = pd.concat([self.seq_rates_df, one_cont_one_length_df], axis=0)
-                
-
-                    
-
-
-
-
-
-        
-
-
-
     
 
     def processAllAnimals(self):
@@ -460,10 +408,17 @@ class SequencesProcessor:
         FileManager.writeMatrix(os.path.join(self.FILES['OUTPUT'], 
                                              f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.txt'), 
                                 self.criterion_matrix)
-        # Write the sequence rates matrix to a file
-        self.seq_rates_df.to_csv(os.path.join(self.FILES['OUTPUT'],
-                                                f'seqRates_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.csv'), 
-                                    index=False)
+        
+        
+    def exportAllSeqCnts(self):
+        """
+        Creates a lengths x contingencies matrix that contains the sequence counts matrix for each length and contingency.
+        """
+        all_seq_cnts = np.zeros((self.LANGUAGE['MAX_SEQUENCE_LENGTH'], self.LANGUAGE['NUM_CONTINGENCIES']), dtype=object)
+        for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
+            for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+                all_seq_cnts[length][cont] = self.sequence_matrix[length][cont].getSeqCounts()
+        return all_seq_cnts
 
 
     

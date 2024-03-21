@@ -1,4 +1,5 @@
 from sequences import SequencesProcessor
+from resampler import Resampler
 from files import FileManager
 from settings import Settings
 
@@ -49,11 +50,7 @@ def startCBASTerminal():
     settings = Settings()
     # settings.setCriterion({'ORDER': 0, 'NUMBER': float('inf'), 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
     settings.setCriterion({'ORDER': 4, 'NUMBER': 100, 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
-    FILES = settings.getFiles()
-    ANIMAL_FILE_FORMAT = settings.getAnimalFileFormat()
-    LANGUAGE = settings.getLanguage()
     CRITERION = settings.getCriterion()
-    CONSTANTS = settings.getConstants()
     print(f'''CRITERION:  Order {CRITERION['ORDER']}, 
             Number {CRITERION['NUMBER']}, 
             {'Include' if CRITERION['INCLUDE_FAILED'] else 'Exclude'} Failed, 
@@ -63,33 +60,44 @@ def startCBASTerminal():
     print(divider)
     section_start = time.time()
     print("Setting up files...")
-    fileManager = FileManager(FILES)
+    fileManager = FileManager(settings.getFiles())
     fileManager.setupFiles()
     print("Files set up. Time taken: ", format_time(time.time() - section_start))
 
     print(divider)
     section_start = time.time()
-    print("Grouping animals...")
-    groups = settings.assignGroups([{"GENOTYPE": 0, "LESION": 0}, {"GENOTYPE": 1, "LESION": 0}])
-    print("Animals grouped. Time taken: ", format_time(time.time() - section_start))
-
-    print(divider)
-    section_start = time.time()
     print("Processing sequences and calculating criterion...")
-    sequencesProcessor = SequencesProcessor(FILES, ANIMAL_FILE_FORMAT, LANGUAGE, CRITERION, CONSTANTS)
-    sequence_matrix = sequencesProcessor.processAllAnimals()
+    sequencesProcessor = SequencesProcessor(settings)
+    sequencesProcessor.processAllAnimals()
     print("Sequences and criterion processed. Time taken: ", format_time(time.time() - section_start))
-
-    print(divider)
-    section_start = time.time()
-    print("Calculating sequence rates...")
-    sequencesProcessor.getSequenceRates(groups)
 
     print(divider)
     section_start = time.time()
     print("Generating sequence and criterion files...")
     sequencesProcessor.generateSequenceFiles()
+    all_seq_cnts = sequencesProcessor.exportAllSeqCnts()
     print("Sequence and criterion files generated. Time taken: ", format_time(time.time() - section_start))
+
+    print(divider)
+    section_start = time.time()
+    print("Grouping animals...")
+    resampler = Resampler(settings)
+    resampler.setAllSeqCntsMatrix(all_seq_cnts)
+    resampler.assignGroups([{"GENOTYPE": 0, "LESION": 0}, {"GENOTYPE": 1, "LESION": 0}])
+    print("Groups assigned:")
+    for i, group in enumerate(resampler.orig_groups):
+        print(f"Group {i + 1}: {len(group)} animals")
+    print("Time taken: ", format_time(time.time() - section_start))
+    section_start = time.time()
+    print("Calculating sequence rates...")
+    seq_rates_matrix = resampler.getSequenceRates(resampler.orig_groups)
+    print("Sequence rates calculated. Time taken: ", format_time(time.time() - section_start))
+    section_start = time.time()
+    print("Writing sequence rates to file...")
+    resampler.writeSequenceRatesFile(seq_rates_matrix)
+    print("Sequence rates written to file. Time taken: ", format_time(time.time() - section_start))
+
+    
 
     
 
