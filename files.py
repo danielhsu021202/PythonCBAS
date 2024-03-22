@@ -11,12 +11,71 @@ from sys import getsizeof
 
 
 
-### SETUP METADATA ###
+class Header:
+    """
+    Represents either a column or row header in a table-like structure.
+    Used to identify the type of data in the header, which dictates what actions can be performed on it.
+    """
+    cbas_types = ['sequence', 'animal', 'cohort', 'trial']
+
+    def __init__(self, axis, header_map: dict=None, header_type=None, header_size=None, custom_types: list[str]=None):
+        # Process and type check the axis information
+        if (type(axis) == int) and (axis in [0, 1]):
+            self.axis = axis
+        elif (type(axis) == str):
+            if axis.lower() in 'row':
+                self.axis = 0
+            elif axis.lower() in 'column':
+                self.axis = 1
+            else:
+                raise ValueError("Axis must be either 0, 1, 'row', or 'column'")
+        
+        self.types = Header.cbas_types
+        if custom_types is not None:
+            self.types += custom_types
+
+        # Process and type check the header information. 
+        # Used to determine whether this header is one type across the entire header or multiple individual types.
+        if header_map is None:
+            if (header_type is not None) and (header_size is not None):
+                raise ValueError("If header_map is None, header_type and header_size must be specified")
+            if header_type not in self.types:
+                raise ValueError(f"Invalid header type {header_type}")
+            self.header_type = header_type
+            self.header_labels = [i for i in np.arange(header_size)]
+        else:
+            if not all(type(t) == str for t in header_map.values()):
+                raise ValueError("All values in header_map must be strings")
+            if all(t.lower() in self.types for t in header_map.values()):
+                self.header_labels = header_map.keys()
+                self.header_types = header_map.values()
+
+    def isOneHeaderType(self):
+        """If the header is one type across the entire header, return True. Otherwise, return False."""
+        return hasattr(self, 'header_type')
+    
+    def isMultiHeaderTypes(self):
+        """If the header is multiple types for each individual header, return True. Otherwise, return False."""
+        return hasattr(self, 'header_types')
+
+    def getHeaderLabels(self):
+        return self.header_labels
+    
+    def getHeaderType(self, idx: int):
+        if self.isOneHeaderType():
+            return self.header_type
+        elif self.isMultiHeaderTypes():
+            return self.header_types[idx]
+        
+
+
 class CBASFile:
-    def __init__(self, name, type, data):
+    def __init__(self, name, type, data, hheader: Header, vheader: Header):
         self.name = name
         self.type = type
         self.data = data
+        assert hheader.axis == 1  # Horizontal headers describe columns
+        assert vheader.axis == 0  # Vertical headers describe rows
 
     def export(self, filepath, type="csv"):
         """Exports the file to the given type"""
