@@ -185,7 +185,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.setDefaultSizes()
 
         self.directories = set([os.path.join("output"), os.path.join("metadata")])
-        
+
         self.refreshFileTree()
         self.df = None
         self.pd_table = None
@@ -199,6 +199,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.countRowsButton.clicked.connect(self.countRows)
         self.countColumnsButton.clicked.connect(self.countColumns)
         self.transposeButton.clicked.connect(self.transpose)
+        self.countNaNButton.clicked.connect(self.countNaN)
         self.clearFunctionTerminalButton.clicked.connect(self.functionTerminal.clear)
 
     def displayHeaderContextMenu(self, pos):
@@ -239,6 +240,10 @@ class FileViewer(QWidget, Ui_FileViewer):
         """Transposes the table."""
         self.df = self.df.transpose()
         self.pd_table.updateTable(self.df)
+
+    def countNaN(self):
+        """Counts the number of NaN values in the table."""
+        self.functionTerminal.appendPlainText("NaNs: " + str(self.df.isnull().sum().sum()))
 
     def naturalSort(self, l):
         """Sorts a list of strings in natural order."""

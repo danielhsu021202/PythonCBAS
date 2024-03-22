@@ -16,7 +16,7 @@ class Header:
     Represents either a column or row header in a table-like structure.
     Used to identify the type of data in the header, which dictates what actions can be performed on it.
     """
-    cbas_types = ['sequence', 'animal', 'cohort', 'trial']
+    cbas_types = ['sequence_number', 'animal_number', 'cohort_number', 'cohort_name', 'trial_number', 'an_key', 'nothing']
 
     def __init__(self, axis, header_map: dict=None, header_type=None, header_size=None, custom_types: list[str]=None):
         # Process and type check the axis information
@@ -70,8 +70,9 @@ class Header:
 
 
 class CBASFile:
-    def __init__(self, name, type, data, hheader: Header, vheader: Header):
+    def __init__(self, name, info, type, data, hheader: Header, vheader: Header):
         self.name = name
+        self.info = info
         self.type = type
         self.data = data
         assert hheader.axis == 1  # Horizontal headers describe columns

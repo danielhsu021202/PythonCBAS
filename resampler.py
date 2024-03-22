@@ -4,23 +4,30 @@ from random import choices
 import pandas as pd
 from settings import Settings
 from files import FileManager
+import numpy as np
+import multiprocessing
 
 
 
 class Resampler:
-    def __init__(self, settings: Settings, seed=925):
+    def __init__(self, settings: Settings, conts='all', seed=925):
         self.LANGUAGE = settings.getLanguage()
         self.CONSTANTS = settings.getConstants()
         self.ANINFOFORMAT = settings.getAnimalInfoFormat()
         self.FILES = settings.getFiles()
         self.CRITERION = settings.getCriterion()
+        self.conts = conts
         self.seed = seed
         self.all_seqcnts_matrix = None
         self.all_animals = None
         self.orig_groups = None
 
     def setAllSeqCntsMatrix(self, all_seqcnts_matrix):
-        self.all_seqcnts_matrix = all_seqcnts_matrix
+        if self.conts == 'all':
+            self.all_seqcnts_matrix = all_seqcnts_matrix
+        else:
+            self.all_seqcnts_matrix = all_seqcnts_matrix[:, self.conts]
+        print(self.all_seqcnts_matrix.shape)
 
     def assignGroups(self, filters: list[dict]):
         """Assigns animals to groups based on the filters provided."""
@@ -43,6 +50,15 @@ class Resampler:
             new_group = choices(self.all_animals, k=len(group))
             new_groups.append(new_group)
         return new_groups
+    
+    def totalSeqs(self):
+        """Returns the total number of sequences in the all_seqcnts_matrix."""
+        num_seqs = 0
+        lengths, conts = self.all_seqcnts_matrix.shape
+        for length in np.arange(lengths):
+            for cont in np.arange(conts):
+                num_seqs += pd.DataFrame(self.all_seqcnts_matrix[length][cont]).shape[1]
+        return num_seqs
 
         
     def getSequenceRates(self, groups: list[np.array]):
@@ -88,12 +104,97 @@ class Resampler:
                     seq_rates_df = pd.concat([seq_rates_df, one_cont_one_len_df], axis=0)
         return seq_rates_df
     
-    def getStudentizedTestStats(self, seq_rates_df: pd.DataFrame):
+    def getStudentizedTestStatsVectorized(self, seq_rates_df: pd.DataFrame):
         """
         Given a dataframe of sequence rates, returns the studentized test statistics for each sequence.
+        Mutates the input dataframe.
         """
-        num_groups = len(self.orig_groups)
+        # Studentized Test Statistics
+        c1c2 = np.zeros_like(seq_rates_df['Group 1 Avg'])  # Initialize c1c2 with zeros
 
+        # Calculate c1c2 only when the standard deviation is defined and both are non-zero
+        valid_indices = (seq_rates_df['Group 1 Var'] > 0) & (seq_rates_df['Group 2 Var'] > 0)
+        c1c2[valid_indices] = (seq_rates_df['Group 1 Avg'][valid_indices] - seq_rates_df['Group 2 Avg'][valid_indices]) / np.sqrt(
+            (seq_rates_df['Group 1 Var'][valid_indices] / seq_rates_df['Group 1 N'][valid_indices]) +
+            (seq_rates_df['Group 2 Var'][valid_indices] / seq_rates_df['Group 2 N'][valid_indices])
+        )        
+        result = np.repeat(c1c2, 2)  # Repeat each element twice
+        result[1::2] *= -1  # Multiply every other element by -1
+        return result
+    
+    def getStudentizedTestStatsLoop(self, seq_rates_df: pd.DataFrame):
+        """
+        Given a dataframe of sequence rates, returns the studentized test statistics for each sequence.
+        Mutates the input dataframe.
+        """
+        # Studentized Test Statistics
+        c1c2 = np.zeros_like(seq_rates_df['Group 1 Avg'])  # Initialize c1c2 with zeros
+
+        # Calculate c1c2 only when the standard deviation is defined and both are non-zero
+        valid_indices = (seq_rates_df['Group 1 Var'] > 0) & (seq_rates_df['Group 2 Var'] > 0)
+        c1c2[valid_indices] = (seq_rates_df['Group 1 Avg'][valid_indices] - seq_rates_df['Group 2 Avg'][valid_indices]) / np.sqrt(
+            (seq_rates_df['Group 1 Var'][valid_indices] / seq_rates_df['Group 1 N'][valid_indices]) +
+            (seq_rates_df['Group 2 Var'][valid_indices] / seq_rates_df['Group 2 N'][valid_indices])
+        )
+
+        result = []
+        for c in c1c2:
+            result.extend([c, -c])
+        return result
+    
+    def resample(self, id=0):
+        np.random.seed(self.seed + id)
+        # Resample the groups
+        resampled_groups = self.resampleGroups()
+        # Calculate the studentized test statistics for the resampled groups
+        seq_rates_df = self.getSequenceRates(resampled_groups)
+        return self.getStudentizedTestStatsVectorized(seq_rates_df)
+    
+    def generateResampledMatrix(self, num_resamples=10000):
+        """
+        Gets the studentized test statistics for the original groups, 
+        then resamples the groups and calculates the studentized test statistics for each sequence.
+        """
+        resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
+        # First do it for the original groups
+        seq_rates_df = self.getSequenceRates(self.orig_groups)
+        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df)
+
+        # Set the first row of the resampled_matrix
+        resampled_matrix[0] = studentized_test_stats
+
+        # Loop over the remaining rows
+        for i in range(1, num_resamples+1):
+            
+            # Set the i-th row of the resampled_matrix
+            resampled_matrix[i] = self.resample(i)
+
+        return resampled_matrix
+    
+    def generateResampledMatrixParallel(self, num_resamples=10000):
+        """
+        Gets the studentized test statistics for the original groups, 
+        then resamples the groups and calculates the studentized test statistics for each sequence.
+        """
+        resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
+        # First do it for the original groups
+        seq_rates_df = self.getSequenceRates(self.orig_groups)
+        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df)
+
+        # Set the first row of the resampled_matrix
+        resampled_matrix[0] = studentized_test_stats
+
+        # Create a pool of worker processes
+        pool = multiprocessing.Pool()
+        # Run self.sample() and store the result in resampled_matrix
+        resampled_matrix[1:] = np.array(pool.map(self.resample, range(1, num_resamples+1)))
+        # Close the pool and wait for all processes to finish
+        pool.close()
+        pool.join()
+
+        return resampled_matrix
+
+        
 
 
     def writeSequenceRatesFile(self, seq_rates_df: pd.DataFrame):
@@ -101,3 +202,9 @@ class Resampler:
         seq_rates_df.to_csv(os.path.join(self.FILES['OUTPUT'],
                                                 f'seqRates_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.csv'), 
                                     index=False)
+        
+    def writeResampledMatrix(self, resampled_matrix: np.array, filename='resampled_matrix'):
+        # Write the resampled matrix to a file
+        np.savetxt(os.path.join(self.FILES['OUTPUT'],
+                                f'{filename}.csv'), 
+                    resampled_matrix, delimiter=',')

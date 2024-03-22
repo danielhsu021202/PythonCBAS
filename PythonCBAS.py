@@ -38,7 +38,7 @@ def format_time(seconds):
         return "{:.2f} days".format(duration.total_seconds() / 86400)
 
 
-def startCBASTerminal():
+def startCBASTerminal(num_samples):
     divider = "=" * 65
 
     start = time.time()
@@ -81,7 +81,7 @@ def startCBASTerminal():
     print(divider)
     section_start = time.time()
     print("Grouping animals...")
-    resampler = Resampler(settings)
+    resampler = Resampler(settings, conts=[1])
     resampler.setAllSeqCntsMatrix(all_seq_cnts)
     resampler.assignGroups([{"GENOTYPE": 0, "LESION": 0}, {"GENOTYPE": 1, "LESION": 0}])
     print("Groups assigned:")
@@ -96,6 +96,18 @@ def startCBASTerminal():
     print("Writing sequence rates to file...")
     resampler.writeSequenceRatesFile(seq_rates_matrix)
     print("Sequence rates written to file. Time taken: ", format_time(time.time() - section_start))
+
+    print(divider)
+    section_start = time.time()
+    print(f"Resampling {num_samples} times...")
+    resampled_matrix = resampler.generateResampledMatrixParallel(num_resamples=num_samples)
+    print(f"Resampling finished. Time taken: ", format_time(time.time() - section_start))
+    section_start = time.time()
+    print("Writing resampled matrix to file...")
+    resampler.writeResampledMatrix(resampled_matrix, filename='resampled_mat_1000_samples_cont_1')
+    print("Resampled matrix written to file. Time taken: ", format_time(time.time() - section_start))
+    
+
 
     
 
@@ -142,11 +154,12 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PythonCBAS")
     parser.add_argument("-s", "--sequence", help="Run sequencing in terminal mode", action="store_true")
+    parser.add_argument("-n", "--num_samples", help="Number of samples to resample", type=int, default=0)
     args = parser.parse_args()
 
     if args.sequence:
         if args.sequence:
-            startCBASTerminal()
+            startCBASTerminal(args.num_samples)
         sys.exit()
     else:
         app = QApplication(sys.argv)
