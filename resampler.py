@@ -27,7 +27,6 @@ class Resampler:
             self.all_seqcnts_matrix = all_seqcnts_matrix
         else:
             self.all_seqcnts_matrix = all_seqcnts_matrix[:, self.conts]
-        print(self.all_seqcnts_matrix.shape)
 
     def assignGroups(self, filters: list[dict]):
         """Assigns animals to groups based on the filters provided."""
@@ -68,6 +67,7 @@ class Resampler:
             Group 1 Averages ... Group n Averages, Original Sequence Number, Length, Contingency
         The rows are sequences, regardless of length and contingency.
         """
+        # Flatten groups and cross check with all_animals
         seq_num_col_name = "Original Seq No."
         seq_rates_df = pd.DataFrame()
         lengths, conts = self.all_seqcnts_matrix.shape

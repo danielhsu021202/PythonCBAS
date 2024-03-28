@@ -133,7 +133,10 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.FileViewerPage.layout().addWidget(self.fileViewer)
 
         # Set size
-        self.resize(1600, 900)
+        self.resize(1920, 1080)
+        # self.showFullScreen()
+        
+        self.mainStack.setCurrentIndex(1)
 
 
     

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Form</class>
- <widget class="QWidget" name="Form">
+ <class>FilterObject</class>
+ <widget class="QWidget" name="FilterObject">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -20,36 +20,101 @@
    <string>Form</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
+   <property name="spacing">
+    <number>5</number>
+   </property>
    <item>
-    <widget class="QComboBox" name="comboBox">
+    <widget class="QComboBox" name="modeCombo">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>50</width>
+       <height>0</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>16777215</height>
+      </size>
+     </property>
      <item>
       <property name="text">
-       <string>Include</string>
+       <string/>
+      </property>
+      <property name="icon">
+       <iconset>
+        <normaloff>../icons/plus.png</normaloff>../icons/plus.png</iconset>
       </property>
      </item>
      <item>
       <property name="text">
-       <string>Exclude</string>
+       <string/>
+      </property>
+      <property name="icon">
+       <iconset>
+        <normaloff>../icons/minus.png</normaloff>../icons/minus.png</iconset>
       </property>
      </item>
     </widget>
    </item>
    <item>
-    <widget class="QComboBox" name="comboBox_2">
-     <item>
-      <property name="text">
-       <string>columns</string>
-      </property>
-     </item>
+    <widget class="QComboBox" name="axisCombo">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>100</width>
+       <height>0</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>16777215</height>
+      </size>
+     </property>
      <item>
       <property name="text">
        <string>rows</string>
       </property>
      </item>
+     <item>
+      <property name="text">
+       <string>columns</string>
+      </property>
+     </item>
     </widget>
    </item>
    <item>
-    <widget class="QComboBox" name="comboBox_3">
+    <widget class="QComboBox" name="operationCombo">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>75</width>
+       <height>0</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>16777215</height>
+      </size>
+     </property>
      <item>
       <property name="text">
        <string>=</string>
@@ -75,50 +140,21 @@
        <string>&gt;=</string>
       </property>
      </item>
-     <item>
-      <property name="text">
-       <string>between</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>containing</string>
-      </property>
-     </item>
     </widget>
    </item>
    <item>
-    <widget class="QLineEdit" name="lineEdit"/>
-   </item>
-   <item>
-    <widget class="QPushButton" name="pushButton">
+    <widget class="QLineEdit" name="valueEdit">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
      <property name="minimumSize">
       <size>
-       <width>24</width>
-       <height>24</height>
+       <width>100</width>
+       <height>0</height>
       </size>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-     <property name="icon">
-      <iconset>
-       <normaloff>../icons/delete_normal.png</normaloff>../icons/delete_normal.png</iconset>
-     </property>
-     <property name="iconSize">
-      <size>
-       <width>20</width>
-       <height>20</height>
-      </size>
-     </property>
-     <property name="flat">
-      <bool>true</bool>
      </property>
     </widget>
    </item>

@@ -108,6 +108,9 @@
         <property name="topMargin">
          <number>10</number>
         </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
         <item>
          <widget class="QGroupBox" name="settingsBox">
           <property name="title">
@@ -117,32 +120,117 @@
          </widget>
         </item>
         <item>
-         <widget class="QGroupBox" name="filterBox">
-          <property name="title">
-           <string>Filters</string>
+         <widget class="QTabWidget" name="tabWidget">
+          <property name="tabPosition">
+           <enum>QTabWidget::North</enum>
           </property>
-          <layout class="QVBoxLayout" name="verticalLayout_5">
-           <item>
-            <widget class="QListView" name="listView"/>
-           </item>
-           <item>
-            <widget class="QPushButton" name="addFilterButton">
-             <property name="toolTip">
-              <string>Add Filter</string>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset>
-               <normaloff>../icons/plus.png</normaloff>../icons/plus.png</iconset>
-             </property>
-             <property name="flat">
-              <bool>false</bool>
-             </property>
-            </widget>
-           </item>
-          </layout>
+          <property name="tabShape">
+           <enum>QTabWidget::Rounded</enum>
+          </property>
+          <property name="currentIndex">
+           <number>0</number>
+          </property>
+          <property name="usesScrollButtons">
+           <bool>false</bool>
+          </property>
+          <widget class="QWidget" name="ViewFiltersTab">
+           <attribute name="title">
+            <string>Filters</string>
+           </attribute>
+           <layout class="QVBoxLayout" name="verticalLayout_5">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <item>
+             <widget class="QTableWidget" name="filterTable">
+              <property name="dragEnabled">
+               <bool>true</bool>
+              </property>
+              <property name="dragDropOverwriteMode">
+               <bool>true</bool>
+              </property>
+              <property name="dragDropMode">
+               <enum>QAbstractItemView::InternalMove</enum>
+              </property>
+              <property name="alternatingRowColors">
+               <bool>true</bool>
+              </property>
+              <attribute name="horizontalHeaderVisible">
+               <bool>true</bool>
+              </attribute>
+              <attribute name="horizontalHeaderStretchLastSection">
+               <bool>true</bool>
+              </attribute>
+              <attribute name="verticalHeaderVisible">
+               <bool>false</bool>
+              </attribute>
+              <column>
+               <property name="text">
+                <string>Filters</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <property name="leftMargin">
+               <number>15</number>
+              </property>
+              <property name="rightMargin">
+               <number>15</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QPushButton" name="addFilterButton">
+                <property name="text">
+                 <string>Add</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="applyFiltersButton">
+                <property name="text">
+                 <string>Apply</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="PipelineTab">
+           <attribute name="title">
+            <string>Pipelines</string>
+           </attribute>
+           <widget class="QPushButton" name="addFilterButton_2">
+            <property name="geometry">
+             <rect>
+              <x>10</x>
+              <y>90</y>
+              <width>246</width>
+              <height>32</height>
+             </rect>
+            </property>
+            <property name="toolTip">
+             <string>Add Filter</string>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>../icons/plus.png</normaloff>../icons/plus.png</iconset>
+            </property>
+            <property name="flat">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </widget>
          </widget>
         </item>
        </layout>
@@ -168,7 +256,11 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="QTableWidget" name="dataTable"/>
+          <widget class="QTableWidget" name="dataTable">
+           <property name="alternatingRowColors">
+            <bool>true</bool>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -199,6 +291,9 @@
        </item>
        <item>
         <widget class="QGroupBox" name="actionsBox">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
          <property name="title">
           <string>Table Actions</string>
          </property>

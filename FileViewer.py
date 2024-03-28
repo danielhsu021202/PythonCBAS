@@ -1,6 +1,6 @@
 
-from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem, QMenu
-from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem, QMenu, QTableWidgetItem, QAbstractItemView
+from PyQt6.QtGui import QIcon, QCursor
 from PyQt6.QtCore import QAbstractTableModel, Qt
 
 import os
@@ -10,6 +10,7 @@ import pandas as pd
 from statistics import median, mode
 
 from ui.FileViewerWidget import Ui_FileViewer
+from ui.FilterObject import Ui_FilterObject
 import os
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtCore import Qt
@@ -83,6 +84,8 @@ class PandasTable(QTableView):
         self.parent = parent
         self.model = PandasTableModel(self.df)
         self.setModel(self.model)
+
+        self.setAlternatingRowColors(True)
 
         self.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.horizontalHeader().customContextMenuRequested.connect(self.onHeaderContextMenuRequested)
@@ -166,6 +169,23 @@ class PandasTable(QTableView):
     def writeToFuncTerminal(self, text):
         self.parent.functionTerminal.appendPlainText(text)
 
+    def countRows(self):
+        """Displays row count in the function terminal."""
+        self.parent.functionTerminal.appendPlainText("Rows: " + str(len(self.df)) if self.df is not None else "No file selected.")
+
+    def countColumns(self):
+        """Displays column count in the function terminal."""
+        self.parent.functionTerminal.appendPlainText("Columns: " + str(len(self.df.columns)) if self.df is not None else "No file selected.")
+
+    def transpose(self):
+        """Transposes the table."""
+        self.df = self.df.transpose()
+        self.updateTable(self.df)
+
+    def countNaN(self):
+        """Counts the number of NaN values in the table."""
+        self.parent.functionTerminal.appendPlainText("NaNs: " + str(self.df.isnull().sum().sum()))
+
 
     
     def updateTable(self, df=None):
@@ -175,6 +195,31 @@ class PandasTable(QTableView):
         self.setModel(self.model)
 
 
+
+
+class FileViewerFilterObject(QWidget, Ui_FilterObject):
+    def __init__(self, parent=None):
+        super(FileViewerFilterObject, self).__init__(parent)
+        self.setupUi(self)
+        self.parent = parent
+
+        # Center the text on the combo boxes
+        for box in [self.modeCombo, self.axisCombo, self.operationCombo]:
+            for choice in range(box.count()):
+                box.setItemData(choice, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)
+
+
+    def getFilter(self, idx):
+        if self.valueEdit.text() == "":
+            self.parent.functionTerminal.appendPlainText(f"Filter {idx + 1}: Value must be specified.")
+            return
+        if not self.modeCombo.text().isnumeric():
+            self.parent.functionTerminal.appendPlainText(f"Filter {idx + 1}: Mode must be an integer.")
+            return
+        return (self.modeCombo.currentIndex(), self.axisCombo.currentText(), self.operationCombo.currentText(), int(self.valueEdit.text()))
+
+
+        
 
         
 
@@ -187,29 +232,56 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.directories = set([os.path.join("output"), os.path.join("metadata")])
 
         self.refreshFileTree()
-        self.df = None
         self.pd_table = None
 
         self.mapButtonActions()
         self.fileTree.itemDoubleClicked.connect(self.openFile)
 
+        self.setupFilterTable()
+
+
+
+
     def mapButtonActions(self):
         self.fileTreeImportButton.clicked.connect(self.importDirectory)
         self.refreshFileTreeButton.clicked.connect(self.refreshFileTree)
-        self.countRowsButton.clicked.connect(self.countRows)
-        self.countColumnsButton.clicked.connect(self.countColumns)
-        self.transposeButton.clicked.connect(self.transpose)
-        self.countNaNButton.clicked.connect(self.countNaN)
+        self.countRowsButton.clicked.connect(lambda: self.tableAction("count_rows"))
+        self.countColumnsButton.clicked.connect(lambda: self.tableAction("count_columns"))
+        self.transposeButton.clicked.connect(lambda: self.tableAction("transpose"))
+        self.countNaNButton.clicked.connect(lambda: self.tableAction("count_nan"))
         self.clearFunctionTerminalButton.clicked.connect(self.functionTerminal.clear)
+        self.addFilterButton.clicked.connect(self.addFilter)
+        self.applyFiltersButton.clicked.connect(self.applyFilters)
 
-    def displayHeaderContextMenu(self, pos):
-        """Displays the context menu for the header.
-            Axis 0 is row, 1 is column."""
-        print("Requested")
-        menu = QMenu()
-        menu.addAction("Sort Ascending",)
-        menu.addAction("Sort Descending")
-        menu.exec(self.dataTable.mapToGlobal(pos))
+    def setupFilterTable(self):
+        # Context menu when a filter table row is right clicked
+        self.filterTable.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.filterTable.customContextMenuRequested.connect(self.displayFilterContextMenu)
+
+    def tableAction(self, action):
+        if self.pd_table is None:
+            self.functionTerminal.appendPlainText("No file selected.")
+            return
+        if action == "count_rows":
+            self.pd_table.countRows()
+        elif action == "count_columns":
+            self.pd_table.countColumns()
+        elif action == "transpose":
+            self.pd_table.transpose()
+        elif action == "count_nan":
+            self.pd_table.countNaN()
+
+
+    def displayFilterContextMenu(self, pos):
+        """Display context menu if a row is right clicked"""
+        index = self.filterTable.indexAt(pos)
+        if index.isValid():
+            menu = QMenu()
+            deleteAction = menu.addAction("Delete")
+            action = menu.exec(QCursor.pos())
+            if action == deleteAction:
+                self.filterTable.removeRow(index.row())
+
         
 
     def importDirectory(self):
@@ -228,22 +300,7 @@ class FileViewer(QWidget, Ui_FileViewer):
             else:
                 pass
 
-    def countRows(self):
-        """Displays row count in the function terminal."""
-        self.functionTerminal.appendPlainText("Rows: " + str(len(self.df)) if self.df is not None else "No file selected.")
-
-    def countColumns(self):
-        """Displays column count in the function terminal."""
-        self.functionTerminal.appendPlainText("Columns: " + str(len(self.df.columns)) if self.df is not None else "No file selected.")
-
-    def transpose(self):
-        """Transposes the table."""
-        self.df = self.df.transpose()
-        self.pd_table.updateTable(self.df)
-
-    def countNaN(self):
-        """Counts the number of NaN values in the table."""
-        self.functionTerminal.appendPlainText("NaNs: " + str(self.df.isnull().sum().sum()))
+    
 
     def naturalSort(self, l):
         """Sorts a list of strings in natural order."""
@@ -291,6 +348,18 @@ class FileViewer(QWidget, Ui_FileViewer):
             self.pd_table = PandasTable(self.df, self)
             self.dataTableLayout.replaceWidget(self.dataTableLayout.itemAt(0).widget(), self.pd_table)
             self.fileNameLabel.setText(os.path.basename(item.data(0, Qt.ItemDataRole.UserRole)))
+            self.actionsBox.setEnabled(True)
+
+    def addFilter(self):
+        idx = self.filterTable.rowCount()
+        self.filterTable.insertRow(idx)
+        self.filterTable.setCellWidget(idx, 0, FileViewerFilterObject(self))
+        self.filterTable.setRowHeight(idx, 50)
+
+    def applyFilters(self):
+        for i in range(self.filterTable.rowCount()):
+            filter = self.filterTable.cellWidget(i, 0).getFilter(i)
+            
 
 
     def setDefaultSizes(self):
