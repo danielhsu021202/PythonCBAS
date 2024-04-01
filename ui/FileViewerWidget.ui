@@ -133,9 +133,9 @@
           <property name="usesScrollButtons">
            <bool>false</bool>
           </property>
-          <widget class="QWidget" name="ViewFiltersTab">
+          <widget class="QWidget" name="PipelineTab">
            <attribute name="title">
-            <string>Filters</string>
+            <string>Pipelines</string>
            </attribute>
            <layout class="QVBoxLayout" name="verticalLayout_5">
             <property name="leftMargin">
@@ -199,13 +199,20 @@
                 </property>
                </widget>
               </item>
+              <item>
+               <widget class="QPushButton" name="clearPipelineButton">
+                <property name="text">
+                 <string>Clear</string>
+                </property>
+               </widget>
+              </item>
              </layout>
             </item>
            </layout>
           </widget>
-          <widget class="QWidget" name="PipelineTab">
+          <widget class="QWidget" name="SQLTab">
            <attribute name="title">
-            <string>Pipelines</string>
+            <string>SQL</string>
            </attribute>
            <widget class="QPushButton" name="addFilterButton_2">
             <property name="geometry">
@@ -239,25 +246,27 @@
      <widget class="QWidget" name="verticalLayoutWidget_4">
       <layout class="QVBoxLayout" name="dataLayout">
        <item>
-        <widget class="QLabel" name="fileNameLabel">
-         <property name="font">
-          <font>
-           <italic>true</italic>
-          </font>
-         </property>
-         <property name="text">
-          <string>No File Selected</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <layout class="QVBoxLayout" name="dataTableLayout">
          <property name="topMargin">
           <number>0</number>
          </property>
          <item>
-          <widget class="QTableWidget" name="dataTable">
-           <property name="alternatingRowColors">
+          <widget class="QTabWidget" name="fileTabs">
+           <property name="font">
+            <font>
+             <family>Academy Engraved LET</family>
+            </font>
+           </property>
+           <property name="currentIndex">
+            <number>-1</number>
+           </property>
+           <property name="documentMode">
+            <bool>true</bool>
+           </property>
+           <property name="tabsClosable">
+            <bool>true</bool>
+           </property>
+           <property name="movable">
             <bool>true</bool>
            </property>
           </widget>

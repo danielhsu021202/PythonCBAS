@@ -1,2 +1,8 @@
 
 
+QTabBar::tab:unselected {
+    color: white;
+}
+
+
+

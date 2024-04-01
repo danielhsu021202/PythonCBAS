@@ -10,7 +10,7 @@ import pandas as pd
 from statistics import median, mode
 
 from ui.FileViewerWidget import Ui_FileViewer
-from ui.FilterObject import Ui_FilterObject
+from PipelineEditor import PipelineDialog
 import os
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtCore import Qt
@@ -196,31 +196,6 @@ class PandasTable(QTableView):
 
 
 
-
-class FileViewerFilterObject(QWidget, Ui_FilterObject):
-    def __init__(self, parent=None):
-        super(FileViewerFilterObject, self).__init__(parent)
-        self.setupUi(self)
-        self.parent = parent
-
-        # Center the text on the combo boxes
-        for box in [self.modeCombo, self.axisCombo, self.operationCombo]:
-            for choice in range(box.count()):
-                box.setItemData(choice, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)
-
-
-    def getFilter(self, idx):
-        if self.valueEdit.text() == "":
-            self.parent.functionTerminal.appendPlainText(f"Filter {idx + 1}: Value must be specified.")
-            return
-        if not self.modeCombo.text().isnumeric():
-            self.parent.functionTerminal.appendPlainText(f"Filter {idx + 1}: Mode must be an integer.")
-            return
-        return (self.modeCombo.currentIndex(), self.axisCombo.currentText(), self.operationCombo.currentText(), int(self.valueEdit.text()))
-
-
-        
-
         
 
 class FileViewer(QWidget, Ui_FileViewer):
@@ -230,6 +205,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.setDefaultSizes()
 
         self.directories = set([os.path.join("output"), os.path.join("metadata")])
+        self.open_files = set()
 
         self.refreshFileTree()
         self.pd_table = None
@@ -250,8 +226,10 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.transposeButton.clicked.connect(lambda: self.tableAction("transpose"))
         self.countNaNButton.clicked.connect(lambda: self.tableAction("count_nan"))
         self.clearFunctionTerminalButton.clicked.connect(self.functionTerminal.clear)
-        self.addFilterButton.clicked.connect(self.addFilter)
+        self.addFilterButton.clicked.connect(self.addStage)
         self.applyFiltersButton.clicked.connect(self.applyFilters)
+        self.clearPipelineButton.clicked.connect(self.filterTable.clear)
+        self.fileTabs.tabCloseRequested.connect(self.closeFile)
 
     def setupFilterTable(self):
         # Context menu when a filter table row is right clicked
@@ -343,18 +321,46 @@ class FileViewer(QWidget, Ui_FileViewer):
     def openFile(self, item):
         """Opens the file and displays it in the table view, replacing the current widget."""
         if item.childCount() == 0:
-            self.df = pd.read_csv(item.data(0, Qt.ItemDataRole.UserRole), header=None)
-            self.df.columns = self.getColumnNames(item.data(0, Qt.ItemDataRole.UserRole))
-            self.pd_table = PandasTable(self.df, self)
-            self.dataTableLayout.replaceWidget(self.dataTableLayout.itemAt(0).widget(), self.pd_table)
-            self.fileNameLabel.setText(os.path.basename(item.data(0, Qt.ItemDataRole.UserRole)))
-            self.actionsBox.setEnabled(True)
+            filepath = item.data(0, Qt.ItemDataRole.UserRole)
+            if filepath not in self.open_files:
+                #TODO: Get rid of self.df
+                self.df = pd.read_csv(filepath, header=None)
+                self.df.columns = self.getColumnNames(filepath)
+                self.pd_table = PandasTable(self.df, self)
+                # New tab
+                self.open_files.add(filepath)
+                self.fileTabs.addTab(self.pd_table, os.path.basename(filepath))
+                self.pd_table.setProperty("filepath", filepath)
+                self.fileTabs.setCurrentWidget(self.pd_table)
+            else:
+                # Switch to the tab whose filepath matches the selected file
+                for i in range(self.fileTabs.count()):
+                    if self.fileTabs.widget(i).property("filepath") == filepath:
+                        self.fileTabs.setCurrentIndex(i)
+                        self.pd_table = self.fileTabs.currentWidget()
+                        break
+            self.actionsBox.setEnabled(len(self.open_files) > 0)
 
-    def addFilter(self):
+    def closeFile(self, index):
+        """Closes the file at the given index."""
+        print(self.open_files)
+        self.open_files.remove(self.fileTabs.widget(index).property("filepath"))
+        self.fileTabs.removeTab(index)
+        self.actionsBox.setEnabled(len(self.open_files) > 0)
+
+    def addStage(self):
+        idx = self.filterTable.rowCount()
+        # Spawn a new PipelineDialog
+        dialog = PipelineDialog(self)
+        dialog.show()
+
+    def appendStageToList(self, stage):
         idx = self.filterTable.rowCount()
         self.filterTable.insertRow(idx)
-        self.filterTable.setCellWidget(idx, 0, FileViewerFilterObject(self))
-        self.filterTable.setRowHeight(idx, 50)
+        self.filterTable.setItem(idx, 0, QTableWidgetItem(str(stage)))
+
+
+        
 
     def applyFilters(self):
         for i in range(self.filterTable.rowCount()):
