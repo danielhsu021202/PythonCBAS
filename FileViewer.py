@@ -228,7 +228,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.clearFunctionTerminalButton.clicked.connect(self.functionTerminal.clear)
         self.addFilterButton.clicked.connect(self.addStage)
         self.applyFiltersButton.clicked.connect(self.applyFilters)
-        self.clearPipelineButton.clicked.connect(self.filterTable.clear)
+        self.clearPipelineButton.clicked.connect(lambda: self.filterTable.setRowCount(0))
         self.fileTabs.tabCloseRequested.connect(self.closeFile)
 
     def setupFilterTable(self):
@@ -359,6 +359,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.filterTable.insertRow(idx)
         self.filterTable.setItem(idx, 0, QTableWidgetItem(str(stage)))
 
+        
 
         
 

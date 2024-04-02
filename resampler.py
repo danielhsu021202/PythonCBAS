@@ -120,6 +120,7 @@ class Resampler:
         )        
         result = np.repeat(c1c2, 2)  # Repeat each element twice
         result[1::2] *= -1  # Multiply every other element by -1
+        
         return result
     
     def getStudentizedTestStatsLoop(self, seq_rates_df: pd.DataFrame):

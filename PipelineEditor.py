@@ -53,6 +53,7 @@ class PipelineDialog(QDialog, Ui_PipelineDialog):
 
     def showError(self, message):
         self.errorLabel.setText(message)
+        self.errorLabel.setStyleSheet("color: red;")
         self.errorLabel.show()
     
     def addStage(self):
