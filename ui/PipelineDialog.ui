@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>284</width>
-    <height>413</height>
+    <width>325</width>
+    <height>429</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -163,12 +163,7 @@
          </property>
          <item>
           <property name="text">
-           <string>row numbers</string>
-          </property>
-         </item>
-         <item>
-          <property name="text">
-           <string>column numbers</string>
+           <string>columns</string>
           </property>
          </item>
          <item>
@@ -199,7 +194,7 @@
           </size>
          </property>
          <property name="placeholderText">
-          <string>row or column number(s)</string>
+          <string>column index/indices or name(s)</string>
          </property>
         </widget>
        </item>
@@ -237,12 +232,27 @@
          </item>
          <item>
           <property name="text">
+           <string>not equal to</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
            <string>less than</string>
           </property>
          </item>
          <item>
           <property name="text">
+           <string>less than or equal to</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
            <string>greater than</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>greater than or equal to</string>
           </property>
          </item>
          <item>
@@ -565,6 +575,13 @@
       <widget class="QPushButton" name="addStageButton">
        <property name="text">
         <string>Add Stage</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="applyNowButton">
+       <property name="text">
+        <string>Apply Now</string>
        </property>
       </widget>
      </item>

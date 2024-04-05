@@ -1,5 +1,5 @@
 
-from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem, QMenu, QTableWidgetItem, QAbstractItemView
+from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem, QMenu, QTableWidgetItem, QAbstractItemView, QMessageBox
 from PyQt6.QtGui import QIcon, QCursor
 from PyQt6.QtCore import QAbstractTableModel, Qt
 
@@ -101,6 +101,9 @@ class PandasTable(QTableView):
         medianAction = menu.addAction("Median")
         modeAction = menu.addAction("Mode")
         rangeAction = menu.addAction("Range")
+        filterAction = ""
+        if self.sender() == self.horizontalHeader():
+            filterAction = menu.addAction("Filter")
         action = menu.exec(self.mapToGlobal(pos))
 
         if action == sortAscendingAction:
@@ -156,6 +159,14 @@ class PandasTable(QTableView):
             else:
                 row = self.rowAt(pos.y())
                 self.writeToFuncTerminal(f"Range of row {row}: [{str(self.df.iloc[row].min())}, {str(self.df.iloc[row].max())}]")
+        elif action == filterAction:
+            # Summon the filter dialog, passing in the name of the column being called
+            self.parent.addStage(col=self.df.columns[self.columnAt(pos.x())])
+
+
+    def filterTable(self, query):
+        self.df.query(query, inplace=True)
+        self.updateTable()
 
     
     def sortColumn(self, column, order):
@@ -226,7 +237,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.transposeButton.clicked.connect(lambda: self.tableAction("transpose"))
         self.countNaNButton.clicked.connect(lambda: self.tableAction("count_nan"))
         self.clearFunctionTerminalButton.clicked.connect(self.functionTerminal.clear)
-        self.addFilterButton.clicked.connect(self.addStage)
+        self.addFilterButton.clicked.connect(lambda: self.addStage(col=""))
         self.applyFiltersButton.clicked.connect(self.applyFilters)
         self.clearPipelineButton.clicked.connect(lambda: self.filterTable.setRowCount(0))
         self.fileTabs.tabCloseRequested.connect(self.closeFile)
@@ -255,10 +266,13 @@ class FileViewer(QWidget, Ui_FileViewer):
         index = self.filterTable.indexAt(pos)
         if index.isValid():
             menu = QMenu()
+            editAction = menu.addAction("Edit")
             deleteAction = menu.addAction("Delete")
             action = menu.exec(QCursor.pos())
             if action == deleteAction:
                 self.filterTable.removeRow(index.row())
+            elif action == editAction:
+                pass
 
         
 
@@ -272,7 +286,7 @@ class FileViewer(QWidget, Ui_FileViewer):
     def refreshFileTree(self):
         """Refreshes the file tree view with the current directories."""
         self.fileTree.clear()
-        for directory in self.directories:
+        for directory in self.naturalSort(self.directories):
             if os.path.isdir(directory):
                 self.populateFileTree(directory, self.fileTree.invisibleRootItem())
             else:
@@ -311,11 +325,15 @@ class FileViewer(QWidget, Ui_FileViewer):
         filename = os.path.basename(filepath)
         if filename == "animals.txt":
             return "animals"
+        elif filename.startswith("allSeqAllAn"):
+            return "allSeqAllAn"
         
     def getColumnNames(self, filepath):
         """Returns the column names of the file at the given path."""
         if self.fileType(filepath) == "animals":
             return ["Animal Number", "Cohort Number", "Animal Key", "Genotype", "Sex", "Lesion", "Implant"]
+        elif self.fileType(filepath) == "allSeqAllAn":
+            return ["Animal Number", "Trial Number", "Sequence Number"]
         else: return [str(i) for i in range(len(self.df.columns))]
 
     def openFile(self, item):
@@ -341,6 +359,12 @@ class FileViewer(QWidget, Ui_FileViewer):
                         break
             self.actionsBox.setEnabled(len(self.open_files) > 0)
 
+    def currentFile(self):
+        """Returns the filepath of the currently open file."""
+        if len(self.open_files) == 0:
+            return None
+        return self.fileTabs.currentWidget().property("filepath")
+
     def closeFile(self, index):
         """Closes the file at the given index."""
         print(self.open_files)
@@ -348,30 +372,54 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.fileTabs.removeTab(index)
         self.actionsBox.setEnabled(len(self.open_files) > 0)
 
-    def addStage(self):
-        idx = self.filterTable.rowCount()
+    def addStage(self, col=""):
         # Spawn a new PipelineDialog
-        dialog = PipelineDialog(self)
+        dialog = PipelineDialog(col, self)
         dialog.show()
 
     def appendStageToList(self, stage):
         idx = self.filterTable.rowCount()
         self.filterTable.insertRow(idx)
         self.filterTable.setItem(idx, 0, QTableWidgetItem(str(stage)))
+        self.filterTable.item(idx, 0).setData(Qt.ItemDataRole.UserRole, stage)
 
         
 
-        
+    def applyStageNow(self, stage_tuple):
+        query, message = PipelineDialog.parseStage(stage_tuple, self.getColumnNames(self.currentFile()), self)
+        if query is None:
+            return
+        self.pd_table.filterTable(query)
+        self.functionTerminal.appendPlainText(message)
 
     def applyFilters(self):
+        if self.currentFile() is None:
+            self.showError("Applying filters", "No file selected.")
+            return
+        queries_and_messages = []
         for i in range(self.filterTable.rowCount()):
-            filter = self.filterTable.cellWidget(i, 0).getFilter(i)
-            
+            query, message = PipelineDialog.parseStage(self.filterTable.item(i, 0).data(Qt.ItemDataRole.UserRole), self.getColumnNames(self.currentFile()), self)
+            if query is None:
+                return
+            queries_and_messages.append(query)
+        # Apply the filters
+        for query, message in queries_and_messages:
+            self.pd_table.filterTable(query)
+            self.functionTerminal.appendPlainText(message)
 
 
     def setDefaultSizes(self):
         # Set the default sizes of the splitter
         self.mainSplitter.setSizes([300, 800, 200])
+
+    def showError(self, action, msg):
+        """Spawn an error dialog"""
+        error_dialog = QMessageBox()
+        error_dialog.setIcon(QMessageBox.Icon.Warning)
+        error_dialog.setText(msg)
+        error_dialog.setWindowTitle(f"Error during {action}")
+        error_dialog.exec()
+
 
     
                 

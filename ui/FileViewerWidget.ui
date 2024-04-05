@@ -138,7 +138,13 @@
             <string>Pipelines</string>
            </attribute>
            <layout class="QVBoxLayout" name="verticalLayout_5">
+            <property name="spacing">
+             <number>0</number>
+            </property>
             <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
              <number>0</number>
             </property>
             <property name="rightMargin">
@@ -175,9 +181,29 @@
              </widget>
             </item>
             <item>
+             <widget class="QPushButton" name="addFilterButton">
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>../icons/plus.png</normaloff>../icons/plus.png</iconset>
+              </property>
+              <property name="flat">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
              <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <property name="spacing">
+               <number>10</number>
+              </property>
               <property name="leftMargin">
                <number>15</number>
+              </property>
+              <property name="topMargin">
+               <number>12</number>
               </property>
               <property name="rightMargin">
                <number>15</number>
@@ -186,9 +212,9 @@
                <number>0</number>
               </property>
               <item>
-               <widget class="QPushButton" name="addFilterButton">
+               <widget class="QPushButton" name="previewPipelineButton">
                 <property name="text">
-                 <string>Add</string>
+                 <string>Preview</string>
                 </property>
                </widget>
               </item>

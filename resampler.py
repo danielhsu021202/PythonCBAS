@@ -104,7 +104,7 @@ class Resampler:
                     seq_rates_df = pd.concat([seq_rates_df, one_cont_one_len_df], axis=0)
         return seq_rates_df
     
-    def getStudentizedTestStatsVectorized(self, seq_rates_df: pd.DataFrame):
+    def getStudentizedTestStatsVectorized(self, seq_rates_df: pd.DataFrame, actual=False):
         """
         Given a dataframe of sequence rates, returns the studentized test statistics for each sequence.
         Mutates the input dataframe.
@@ -120,8 +120,11 @@ class Resampler:
         )        
         result = np.repeat(c1c2, 2)  # Repeat each element twice
         result[1::2] *= -1  # Multiply every other element by -1
-        
-        return result
+        if actual:
+            return result
+        else:
+            paired_result = [(idx, val) for idx, val in enumerate(result) if val > 0]
+            return paired_result
     
     def getStudentizedTestStatsLoop(self, seq_rates_df: pd.DataFrame):
         """
@@ -159,7 +162,7 @@ class Resampler:
         resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
         # First do it for the original groups
         seq_rates_df = self.getSequenceRates(self.orig_groups)
-        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df)
+        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df, actual=True)
 
         # Set the first row of the resampled_matrix
         resampled_matrix[0] = studentized_test_stats
@@ -177,18 +180,19 @@ class Resampler:
         Gets the studentized test statistics for the original groups, 
         then resamples the groups and calculates the studentized test statistics for each sequence.
         """
-        resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
+        # resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
+        resampled_matrix = []
         # First do it for the original groups
         seq_rates_df = self.getSequenceRates(self.orig_groups)
-        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df)
+        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df, actual=True)
 
         # Set the first row of the resampled_matrix
-        resampled_matrix[0] = studentized_test_stats
+        resampled_matrix.append(studentized_test_stats)
 
         # Create a pool of worker processes
         pool = multiprocessing.Pool()
-        # Run self.sample() and store the result in resampled_matrix
-        resampled_matrix[1:] = np.array(pool.map(self.resample, range(1, num_resamples+1)))
+        # Run self.sample() and append the result to resampled_matrix
+        resampled_matrix.extend(pool.map(self.resample, range(1, num_resamples+1)))
         # Close the pool and wait for all processes to finish
         pool.close()
         pool.join()
@@ -204,8 +208,11 @@ class Resampler:
                                                 f'seqRates_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.csv'), 
                                     index=False)
         
-    def writeResampledMatrix(self, resampled_matrix: np.array, filename='resampled_matrix'):
+    def writeResampledMatrix(self, resampled_matrix, filename='resampled_matrix'):
         # Write the resampled matrix to a file
-        np.savetxt(os.path.join(self.FILES['OUTPUT'],
-                                f'{filename}.csv'), 
-                    resampled_matrix, delimiter=',')
+        # np.savetxt(os.path.join(self.FILES['OUTPUT'],
+        #                         f'{filename}.csv'), 
+        #             resampled_matrix, delimiter=',')
+
+        # Pickle the resampled matrix
+        FileManager.pickle_obj(resampled_matrix, os.path.join(self.FILES['OUTPUT'], f'{filename}.pkl'))
