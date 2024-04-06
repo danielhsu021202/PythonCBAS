@@ -4,6 +4,7 @@ import re
 import numpy as np
 import time
 import pickle
+import gzip
 from sys import getsizeof
 
 
@@ -70,13 +71,31 @@ class Header:
 
 
 class CBASFile:
-    def __init__(self, name, info, type, data, hheader: Header, vheader: Header):
+    file_types = {
+        'MATRIX': 'matrix',
+        'DATAFRAME': 'dataframe'
+    }
+
+    def __init__(self, name, data, info=None, type=None, hheader: Header=None, vheader: Header=None):
         self.name = name
         self.info = info
         self.type = type
         self.data = data
-        assert hheader.axis == 1  # Horizontal headers describe columns
-        assert vheader.axis == 0  # Vertical headers describe rows
+
+    def getType(self):
+        return self.type
+
+    def getData(self):
+        return self.data
+
+    def saveFile(self, location):
+        """Pickle this object to a file"""
+        # Ensure valid directory
+        if not os.path.exists(location):
+            os.makedirs(location)
+        # Construct the filepath by joining the location and the name, with the extension .cbas
+        filepath = os.path.join(location, self.name + '.cbas')
+        FileManager.writeCBASFile(filepath, self)
 
     def export(self, filepath, type="csv"):
         """Exports the file to the given type"""
@@ -160,7 +179,9 @@ class FileManager:
         
     def writeCBASFile(filepath, fileobj: CBASFile):
         """Writes a CBASFile object to a file"""
-        FileManager.pickle_obj(fileobj, filepath)
+        with gzip.open(filepath, 'wb') as f:
+            pickle.dump(fileobj, f)
+        # FileManager.pickle_obj(fileobj, filepath)
 
     def readCBASFile(filepath) -> CBASFile:
         """Reads a CBASFile object from a file"""
@@ -182,10 +203,8 @@ class FileManager:
         Then processes the cohort and animal information and writes it to the metadata files.
         """
         # Clear output directory
-        if not os.path.exists(self.FILES['OUTPUT']):
-            os.rmdir(self.FILES['OUTPUT'])
-        if not os.path.exists(self.FILES['METADATA']):
-            os.rmdir(self.FILES['METADATA'])
+        if os.path.exists(self.FILES['OUTPUT']):
+            os.system(f"rm -r {self.FILES['OUTPUT']}")
 
         Path(self.FILES['METADATA']).mkdir(parents=True, exist_ok=True)
         self.clearMetadata()

@@ -3,6 +3,8 @@ from ui.PipelineDialog import Ui_PipelineDialog
 from PyQt6.QtWidgets import QDialog, QWidget
 from PyQt6.QtCore import Qt
 
+from utils import StringUtils
+
 class PipelineDialog(QDialog, Ui_PipelineDialog):
 
     type_indices = {
@@ -122,20 +124,6 @@ class PipelineDialog(QDialog, Ui_PipelineDialog):
         else:
             return None
     
-    def parseComplexRange(range_str: str):
-        """Parses a complex range string and returns a tuple of the range."""
-        try:
-            tokens = range_str.split(",")
-            values = []
-            for token in tokens:
-                if "-" in token:
-                    values.extend(range(int(token.split("-")[0]), int(token.split("-")[1]) + 1))
-                else:
-                    values.append(int(token))
-            return values
-        except:
-            return None
-    
     def parseStage(stage: tuple, column_names: list, parent):
         """Parses the information in the filter stage, and returns a pandas query string."""
         # TODO: CLEAN THIS UP
@@ -149,7 +137,7 @@ class PipelineDialog(QDialog, Ui_PipelineDialog):
                 if operation == "between":
                     query = ' or '.join([f"({str(col)} >= {int(value[0])} and {str(col)} <= {int(value[1])})" for col in ticked_column_names])
                 elif operation == "in":
-                    values = PipelineDialog.parseComplexRange(value)
+                    values = StringUtils.parseComplexRange(value)
                     if values is None:
                         parent.showError("Filtering", "Error: Invalid range format for 'in' operation.")
                         return None
@@ -158,7 +146,7 @@ class PipelineDialog(QDialog, Ui_PipelineDialog):
                     query = ' or '.join([f"({str(col)} {operation} {int(value)})" for col in ticked_column_names])
             elif axis == 'columns':
                 # Determine whether the it's indices or column names
-                indices = PipelineDialog.parseComplexRange(index)
+                indices = StringUtils.parseComplexRange(index)
                 cols = []
                 if indices:
                     for i in indices:
@@ -184,7 +172,7 @@ class PipelineDialog(QDialog, Ui_PipelineDialog):
                 if operation == "between":
                     query = ' and '.join([f"({str(col)} >= {int(value[0])} and {str(col)} <= {int(value[1])})" for col in cols])
                 elif operation == "in":
-                    values = PipelineDialog.parseComplexRange(value)
+                    values = StringUtils.parseComplexRange(value)
                     if values is None:
                         parent.showError("Filtering", "Error: Invalid range format for 'in' operation.")
                         return None
@@ -193,7 +181,7 @@ class PipelineDialog(QDialog, Ui_PipelineDialog):
                     query = ' and '.join([f"({str(col)} {operation} {int(value)})" for col in cols])
 
             query = f"not ({query})" if mode == "Exclude" else query
-            index_str = f"where {index} are" if axis == "columns" else "where all columns are"
+            index_str = f"where {StringUtils.andSeparateStr(index, include_verb=True)}" if axis == "columns" else "where all columns are"
             value_str = ""
             if operation == "between":
                 value_str = f"{value[0]} and {value[1]}"

@@ -15,8 +15,9 @@ import time
 
 from random import randint
 
-from files import FileManager
+from files import FileManager, CBASFile
 from settings import Settings
+from utils import HexUtils
 
 
 
@@ -25,16 +26,25 @@ class SequenceManager:
     Manages the sequence numbers as well as the trial numbers and animal numbers of each sequence.
     Each SequenceManager object corresponds to a single sequence length and contingency.
     """
+    next_number = 0  # The next number to assign to a new sequence
 
-    def __init__(self, cont: int, length: int):
+    def __init__(self, cont: int, length: int, LANGUAGE):
 
-        self.next_number = 0
+        self.next_number = 0  # The next number to assign to a new sequence
+
+
+
         self.seq_nums = {}  # Maps sequences to numbers
         self.animal_trials = []  # This is a 2D array for allSeqAllAn
         self.seq_counts = np.zeros((1, 1)) # This is a 2D array for seqCnts
 
+        self.LANGUAGE = LANGUAGE
+
         self.cont = cont
         self.length = length
+
+    def resetNextNumber(self):
+        SequenceManager.next_number = 0
         
     def getSeqNums(self):
         return self.seq_nums
@@ -53,6 +63,7 @@ class SequenceManager:
         if seq_num is not None:
             return seq_num
         else:
+            seq_num = HexUtils.getSeqNumHexNum(self.next_number, self.cont, self.length, self.LANGUAGE)
             self.seq_nums[sequence] = self.next_number
             self.next_number += 1
             return self.next_number - 1
@@ -126,7 +137,10 @@ class SequenceManager:
         """
         Generate the seqCnts file for this sequence length and contingency.
         """
-        FileManager.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
+        name = f'seqCnts_{cont}_{seq_len}'
+        cbasFile = CBASFile(name, self.seq_counts)
+        cbasFile.saveFile(FILES['SEQCNTSDIR'])
+        # FileManager.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
     
     def numUniqueSeqs(self):
         """Returns the largest sequence number registered."""
@@ -152,7 +166,7 @@ class SequencesProcessor:
         self.CONSTANTS = settings.getConstants()
 
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
-        self.sequence_matrix = [[SequenceManager(cont, seq_len+1) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        self.sequence_matrix = [[SequenceManager(cont, seq_len+1, self.LANGUAGE) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
         self.criterion_matrix = None  # This is initialized in the processAllAnimals() function
         self.seq_rates_df = None  # This is initialized in the getSequenceRates() function
         self.current_animal_num = self.CONSTANTS['NaN']

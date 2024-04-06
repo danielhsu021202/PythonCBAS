@@ -22,10 +22,10 @@ class Settings:
 
         self.files = {
             'DATA': 'Data/scn2aDataSwapped/',
-            'OUTPUT': 'output/',
-            'ALLSEQDIR': os.path.join('output', 'All Seq'),
-            'ALLSEQALLANDIR': os.path.join('output', 'All Seq All An'),
-            'SEQCNTSDIR': os.path.join('output', 'Sequence Counts'),
+            'OUTPUT': 'output_hex/',
+            'ALLSEQDIR': os.path.join('output_hex', 'All Seq'),
+            'ALLSEQALLANDIR': os.path.join('output_hex', 'All Seq All An'),
+            'SEQCNTSDIR': os.path.join('output_hex', 'Sequence Counts'),
             'METADATA': 'metadata/',
             'EXPECTED_OUTPUT': 'expected_output_scn2a/',
             'COHORTS_FILE': os.path.join('metadata', 'cohorts.txt'),
