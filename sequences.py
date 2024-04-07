@@ -17,7 +17,7 @@ from random import randint
 
 from files import FileManager, CBASFile
 from settings import Settings
-from utils import HexUtils
+from utils import HexUtils, FileUtils, MatrixUtils
 
 
 
@@ -26,25 +26,17 @@ class SequenceManager:
     Manages the sequence numbers as well as the trial numbers and animal numbers of each sequence.
     Each SequenceManager object corresponds to a single sequence length and contingency.
     """
-    next_number = 0  # The next number to assign to a new sequence
+    universal_next_number = 0  # The next number to assign to a new sequence
 
-    def __init__(self, cont: int, length: int, LANGUAGE):
-
-        self.next_number = 0  # The next number to assign to a new sequence
-
-
+    def __init__(self, cont: int, length: int):
 
         self.seq_nums = {}  # Maps sequences to numbers
         self.animal_trials = []  # This is a 2D array for allSeqAllAn
         self.seq_counts = np.zeros((1, 1)) # This is a 2D array for seqCnts
 
-        self.LANGUAGE = LANGUAGE
 
         self.cont = cont
         self.length = length
-
-    def resetNextNumber(self):
-        SequenceManager.next_number = 0
         
     def getSeqNums(self):
         return self.seq_nums
@@ -63,10 +55,10 @@ class SequenceManager:
         if seq_num is not None:
             return seq_num
         else:
-            seq_num = HexUtils.getSeqNumHexNum(self.next_number, self.cont, self.length, self.LANGUAGE)
-            self.seq_nums[sequence] = self.next_number
-            self.next_number += 1
-            return self.next_number - 1
+            # seq_num = HexUtils.getSeqNumHexNum(self.next_number, self.cont, self.length, self.LANGUAGE)
+            self.seq_nums[sequence] = SequenceManager.universal_next_number
+            SequenceManager.universal_next_number += 1
+            return SequenceManager.universal_next_number - 1
         
     def registerAnimalAndTrial(self, animal_num: int, trial_num: int, seq_num: int):
         """
@@ -81,7 +73,39 @@ class SequenceManager:
         seq_num = self.registerSeqNum(sequence)
         self.registerAnimalAndTrial(animal_num, trial_num, seq_num)
         return seq_num
+        
+    def genAllSeqFile(self, FILES, cont, seq_len):
+        """
+        Generate the allSeq file for this sequence length and contingency.
+        """
+        # Turn into a 2D array
+        mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
+        FileUtils.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
+    
+    def genAllSeqAllAnFile(self, FILES, cont, seq_len):
+        """
+        Generate the allSeqAllAn file for this sequence length and contingency.
+        """
+        # Turn into a 2D array
+        mat = np.array(self.animal_trials)
+        FileUtils.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
 
+    
+    def numUniqueSeqsUniversal(self):
+        """Returns the largest sequence number registered."""
+        return SequenceManager.universal_next_number - 1
+
+    def __len__(self):
+        """Returns the number of sequences registered, not unique."""
+        return len(self.animal_trials)
+    
+    
+class SequenceCountsProcessor: 
+    def __init__(self, animal_count: int, CONSTANTS):
+        self.animal_count = animal_count
+        self.seq_counts = np.zeros((self.animal_count, 1))
+        self.CONSTANTS = CONSTANTS
+        
     def updateSeqCnt(self, seq_num: int, animal_num: int, increment: bool):
         """
         Increment the sequence counts for this sequence length and contingency.
@@ -91,69 +115,46 @@ class SequenceManager:
         rows, cols = self.seq_counts.shape
         if seq_num >= cols:
             cols_to_add = max(seq_num - cols + 1, cols * 2)
-            self.seq_counts = np.append(self.seq_counts, np.zeros((len(self.seq_counts), cols_to_add)), axis=1)
+            self.seq_counts = np.append(self.seq_counts, np.zeros((self.animal_count, cols_to_add)), axis=1)
         # If animal_num is greater than or equal to the number of rows, we add enough rows to accommodate the new animal number
-        if animal_num >= rows:
-            self.seq_counts = np.append(self.seq_counts, np.zeros((animal_num - rows + 1, len(self.seq_counts[0]))), axis=0)
+        # if animal_num >= rows:
+        #     self.seq_counts = np.append(self.seq_counts, np.zeros((animal_num - rows + 1, len(self.seq_counts[0]))), axis=0)
         # Increment the count
         if increment:
             self.seq_counts[animal_num][seq_num] += 1
 
-
-    def setParticipationSeqCnts(self, animal_nums: list[int], null_val: int):
+    def nanAnimalSeqCnts(self, seq_num: int, animal_nums: list[int]):
         """
-        Sets the whole row in the sequence counts matrix to null_val.
+        Set the columns in the seq_num and rows in animal_nums to NaN.
         """
-        null_array = np.full(len(self.seq_counts[0]), null_val)
         for animal_num in animal_nums:
-            self.seq_counts[animal_num] = null_array
-        
+            self.seq_counts[animal_num][seq_num] = self.CONSTANTS['NaN']
 
-    def trimSeqCnts(self):
+    def setParticipationSeqCnts(self, seq_range: tuple, animal_nums: list[int], null_val: int):
+        """
+        Set the columns in the seq_range and rows in animal_nums to null_val.
+        """
+        for animal_num in animal_nums:
+            self.seq_counts[animal_num][seq_range[0]:seq_range[1]] = null_val
+        # null_array = np.full(len(self.seq_counts[0]), null_val)
+        # for animal_num in animal_nums:
+        #     self.seq_counts[animal_num] = null_array
+    
+    def trimSeqCnts(self, next_number: int):
         """
         Trim columns with index greater than the maximum sequence number.
         """
-        self.seq_counts = self.seq_counts[:, :self.next_number]
+        self.seq_counts = self.seq_counts[:, :next_number]
         # self.seq_counts = self.seq_counts[:, np.any(self.seq_counts, axis=0)]
-        
-        
-    def genAllSeqFile(self, FILES, cont, seq_len):
-        """
-        Generate the allSeq file for this sequence length and contingency.
-        """
-        # Turn into a 2D array
-        mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
-        FileManager.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
-    
-    def genAllSeqAllAnFile(self, FILES, cont, seq_len):
-        """
-        Generate the allSeqAllAn file for this sequence length and contingency.
-        """
-        # Turn into a 2D array
-        mat = np.array(self.animal_trials)
-        FileManager.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
 
-    def genSeqCntsFile(self, FILES, cont, seq_len):
+    def genSeqCntsFile(self, FILES):
         """
         Generate the seqCnts file for this sequence length and contingency.
         """
-        name = f'seqCnts_{cont}_{seq_len}'
-        cbasFile = CBASFile(name, self.seq_counts)
-        cbasFile.saveFile(FILES['SEQCNTSDIR'])
-        # FileManager.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
-    
-    def numUniqueSeqs(self):
-        """Returns the largest sequence number registered."""
-        return self.next_number - 1
-
-    def __len__(self):
-        """Returns the number of sequences registered, not unique."""
-        return len(self.animal_trials)
-    
-    
-    
-        
-    
+        # name = f'seqCnts'
+        # cbasFile = CBASFile(name, self.seq_counts)
+        # cbasFile.saveFile(FILES['SEQCNTSDIR'])
+        FileUtils.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts.txt'), self.seq_counts)
         
 
 class SequencesProcessor:
@@ -166,9 +167,11 @@ class SequencesProcessor:
         self.CONSTANTS = settings.getConstants()
 
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
-        self.sequence_matrix = [[SequenceManager(cont, seq_len+1, self.LANGUAGE) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        self.sequence_matrix = [[SequenceManager(cont, seq_len+1) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        self.seq_cnts_processor = None  # Will initialize once we get the total number of animals
         self.criterion_matrix = None  # This is initialized in the processAllAnimals() function
         self.seq_rates_df = None  # This is initialized in the getSequenceRates() function
+        self.seq_num_index = {}  # Maps sequence number range to (cont, length) pair
         self.current_animal_num = self.CONSTANTS['NaN']
         self.total_animals = self.CONSTANTS['NaN']
 
@@ -263,12 +266,12 @@ class SequencesProcessor:
                 return trial_num
 
 
-    def updateSequenceCounts(self, length: int, cont: int, seq_num: int, increment: bool):
+    def updateSequenceCounts(self, seq_num: int, increment: bool):
         """
         Increment the sequence counts for this sequence length and contingency.
         If increment is False, we are just registering the sequence number and animal number to the sequence counts matrix, so no incrementing needed.
         """
-        self.sequence_matrix[length-1][cont].updateSeqCnt(seq_num, self.current_animal_num, increment)
+        self.seq_cnts_processor.updateSeqCnt(seq_num, self.current_animal_num, increment)
 
     def registerMissingContingency(self, cont: int):
         """
@@ -311,7 +314,6 @@ class SequencesProcessor:
             # Set the trial # to -1 for in the criterion_matrix
             self.updateCriterionMatrix(missing_contingency, None, None)
             self.registerMissingContingency(missing_contingency)  # Register the missing contingency for the current animal
-
         # Split the matrix horizontally by the contingency column
         by_contingency = np.split(mat, np.where(np.diff(mat[:, self.COLUMNS['CONTINGENCY_COL']]))[0] + 1)
         # Return an array of tuples: each tuple contains the sub-matrix with the contingency column removed, as well as the contingency value.
@@ -346,6 +348,10 @@ class SequencesProcessor:
         """
         if not self.LANGUAGE['STRADDLE_SESSIONS']:
             trial = 0  # We uniquely identify sequences by their the first trial of occurence
+
+            # If for this contingency, there are animals that did not participate, we'll go ahead and set their sequence counts to NaN
+            animals_missing_this_cont = self.missing_contingencies[cont] if cont in self.missing_contingencies else []
+
             while trial <= len(mat) - length:
                 last_idx_of_sequence = trial + length - 1
                 if mat[trial, self.COLUMNS['SESSION_NO_COL']] == mat[last_idx_of_sequence, self.COLUMNS['SESSION_NO_COL']]:
@@ -357,10 +363,13 @@ class SequencesProcessor:
                     if is_order_length:
                         criterion_reached = self.updateCriterionMatrix(cont, trial, sequence)
                         # If the criterion has not been reached, we need to keep updating the sequence counts
-                        self.updateSequenceCounts(length, cont, seq_num, not criterion_reached)
+                        self.updateSequenceCounts(seq_num, not criterion_reached)
                     else:
                         # Otherwise, the criterion has already been processed and we can now use the criterion trial number to update the sequence counts
-                        self.updateSequenceCounts(length, cont, seq_num, trial <= self.findCriterionTrial(cont))
+                        self.updateSequenceCounts(seq_num, trial <= self.findCriterionTrial(cont))
+
+                    if animals_missing_this_cont:
+                        self.seq_cnts_processor.nanAnimalSeqCnts(seq_num, animals_missing_this_cont)
 
                     trial += 1
                 else:
@@ -381,8 +390,9 @@ class SequencesProcessor:
         Goes through all the animals and processes their sequences, registering them to the SequenceManager contained in 
         self.sequence_matrix.
         """
-        all_paths = FileManager.unpickle_obj(os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
+        all_paths = FileUtils.unpickleObj(os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
         self.total_animals = len(all_paths)
+        self.seq_cnts_processor = SequenceCountsProcessor(self.total_animals, self.CONSTANTS)
         self.criterion_matrix = [[(0, 0) for _ in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for _ in np.arange(self.total_animals)]
         for animal_num, animal in enumerate(all_paths):
             self.current_animal_num = animal_num
@@ -392,17 +402,29 @@ class SequencesProcessor:
             self.getAllLengthSequences(mats_by_cont)
             self.postProcessCriterionMatrixCurrAnimalRow()
         
-        # Trim the sequence counts matrices
-        for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
-            for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
-                self.sequence_matrix[length][cont].trimSeqCnts()
+        # POSTPROCESS
+        self.seq_cnts_processor.trimSeqCnts(SequenceManager.universal_next_number)
 
-        # Set the missing contingencies to NaN in the sequence counts matrices
-        for missing_cont in self.missing_contingencies.keys():
-            # Get all the SequenceManager objects for this contingency
-            col = [self.sequence_matrix[length][missing_cont] for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
-            for seq_manager in col:
-                seq_manager.setParticipationSeqCnts(self.missing_contingencies[missing_cont], self.CONSTANTS['NaN'])
+        # for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
+        #     for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+        #         # Build the sequence number index
+        #         seq_nums = self.sequence_matrix[length][cont].getSeqNums().values()
+        #         self.seq_num_index[(min(seq_nums), max(seq_nums))] = (cont, length+1)
+
+        # # Set the missing contingencies to NaN in the sequence counts matrices
+        # for missing_cont, animal_lst in self.missing_contingencies.items():
+        #     # Get the ranges involved with this contingency using the sequence number index
+        #     for seq_range, cont_len_pair in self.seq_num_index.items():
+        #         if cont_len_pair[0] == missing_cont:
+        #             self.seq_cnts_processor.setParticipationSeqCnts(seq_range, animal_lst, self.CONSTANTS['NaN'])
+
+
+            # # Get all the SequenceManager objects for this contingency
+            # col = [self.sequence_matrix[length][missing_cont] for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+            # for seq_manager in col:
+            #     seq_manager.setParticipationSeqCnts(self.missing_contingencies[missing_cont], self.CONSTANTS['NaN'])
+
+
 
         return self.sequence_matrix
 
@@ -416,12 +438,17 @@ class SequencesProcessor:
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
                 self.sequence_matrix[length][cont].genAllSeqFile(self.FILES, cont, length+1)
                 self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES, cont, length+1)
-                self.sequence_matrix[length][cont].genSeqCntsFile(self.FILES, cont, length+1)
+        
+        # Write the sequence counts file
+        self.seq_cnts_processor.genSeqCntsFile(self.FILES)
         
         # Write the criterion matrix to a file
-        FileManager.writeMatrix(os.path.join(self.FILES['OUTPUT'], 
+        FileUtils.writeMatrix(os.path.join(self.FILES['OUTPUT'], 
                                              f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.txt'), 
                                 self.criterion_matrix)
+        
+        # Pickle the sequence number index into metadata
+        FileUtils.pickleObj(self.seq_num_index, os.path.join(self.FILES['METADATA'], 'seq_num_index.pkl'))
         
         
     def exportAllSeqCnts(self):

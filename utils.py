@@ -1,4 +1,8 @@
-
+import numpy as np
+import re
+import pickle
+import gzip
+from scipy.sparse import csr_matrix
 
 class HexUtils:
 
@@ -45,3 +49,66 @@ class StringUtils:
     def andSeparateStr(string: str, include_verb=False) -> str:
         """Returns a string with the elements of the string separated by 'and'."""
         return StringUtils.andSeparateList([s.strip() for s in string.split(",")], include_verb)
+    
+
+class FileUtils:
+
+    def getMatrix(file, delimiter=',', dtype=int):
+        """Takes a text file and returns a numpy matrix"""
+        # Force it to be 2D even if there's only one row
+        return np.atleast_2d(np.genfromtxt(file, delimiter=delimiter, dtype=dtype))
+    
+    def writeMatrix(file, mat, filetype='txt', delimiter=',', fmt='%d'):
+        """Writes a numpy matrix to a text file. Don't write an extra line"""
+        np.savetxt(file, mat, delimiter=delimiter, fmt=fmt)
+
+    def isCompressed(filepath):
+        """Returns True if the file is compressed, False otherwise"""
+        try:
+            with open(filepath, 'rb') as f:
+                return f.read(2) == b'\x1f\x8b'
+        except OSError:
+            return False
+
+    def pickleObj(obj, filepath, compress=False):
+        """Pickle an object to a file. User can choose to compress the file."""
+        if compress:
+            with gzip.open(filepath, 'wb') as f:
+                pickle.dump(obj, f)
+        else:
+            with open(filepath, 'wb') as f:
+                pickle.dump(obj, f)
+
+    def unpickleObj(filepath):
+        """Unpickle an object from a file. Decompress if necessary."""
+        if FileUtils.isCompressed(filepath):
+            with gzip.open(filepath, 'rb') as f:
+                return pickle.load(f)
+        else:
+            with open(filepath, 'rb') as f:
+                return pickle.load(f)
+            
+class MatrixUtils:
+
+    def isSparse(matrix, threshold=0.2):
+        """Returns True if the matrix is sparse, False otherwise."""
+        sparsity = np.count_nonzero(matrix) / matrix.size
+        return sparsity < threshold
+    
+    def csrCompress(matrix):
+        """Compresses a matrix to a CSR matrix."""
+        return csr_matrix(matrix)
+    
+    def csrDecompress(csr_matrix: csr_matrix):
+        """Decompresses a CSR matrix to a dense matrix."""
+        return csr_matrix.toarray()
+
+
+
+class ListUtils:
+
+    def naturalSort(l):
+        """Sorts the given list in natural order."""
+        convert = lambda text: int(text) if text.isdigit() else text
+        alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+        return sorted(l, key=alphanum_key)

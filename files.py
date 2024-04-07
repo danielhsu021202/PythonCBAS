@@ -6,6 +6,7 @@ import time
 import pickle
 import gzip
 from sys import getsizeof
+from utils import FileUtils, ListUtils, MatrixUtils
 
 
 
@@ -72,8 +73,17 @@ class Header:
 
 class CBASFile:
     file_types = {
-        'MATRIX': 'matrix',
-        'DATAFRAME': 'dataframe'
+        'MATRIX': 0,
+        'DATAFRAME': 1,
+        'ALLSEQ': 2,
+        'ALLSEQALLAN': 3,
+        'SEQCNTS': 4,
+    }
+
+    compression_formats = {
+        'UNCOMPRESSED': 0,
+        'GZIP': 1,
+        'CSR': 2,
     }
 
     def __init__(self, name, data, info=None, type=None, hheader: Header=None, vheader: Header=None):
@@ -81,6 +91,7 @@ class CBASFile:
         self.info = info
         self.type = type
         self.data = data
+        self.compression = 0  # This will be set when the file is saved
 
     def getType(self):
         return self.type
@@ -88,20 +99,38 @@ class CBASFile:
     def getData(self):
         return self.data
 
-    def saveFile(self, location):
+    def saveFile(self, location, use_sparsity_csr=False):
         """Pickle this object to a file"""
         # Ensure valid directory
         if not os.path.exists(location):
             os.makedirs(location)
         # Construct the filepath by joining the location and the name, with the extension .cbas
         filepath = os.path.join(location, self.name + '.cbas')
-        FileManager.writeCBASFile(filepath, self)
+
+        if use_sparsity_csr:
+            assert type(self.data) == np.ndarray
+            if MatrixUtils.isSparse(self.data):
+                self.data = MatrixUtils.csrCompress(self.data)
+                self.compression = CBASFile.compression_formats['CSR']
+            else:
+                self.compression = CBASFile.compression_formats['UNCOMPRESSED']
+        else:
+            self.compression = CBASFile.compression_formats['UNCOMPRESSED']
+        FileUtils.pickleObj(self, filepath)
+
+    def loadFile(filepath):
+        """Unpickle a file, decompress if necessary, and return the object"""
+        file = FileUtils.unpickleObj(filepath)
+        assert type(file) == CBASFile
+        if file.compression == CBASFile.compression_formats['CSR']:
+            file.data = MatrixUtils.csrDecompress(file.data)
+        return file
 
     def export(self, filepath, type="csv"):
         """Exports the file to the given type"""
         if type == "csv":
             # TODO: Type checking
-            FileManager.writeMatrix(filepath, self.data)
+            FileUtils.writeMatrix(filepath, self.data)
 
     def __eq__(self, other):
         pass
@@ -110,10 +139,7 @@ class FileManager:
     def __init__(self, FILES):
         self.FILES = FILES
 
-    def natural_sort(l):
-        convert = lambda text: int(text) if text.isdigit() else text
-        alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-        return sorted(l, key=alphanum_key)
+    
 
     def buildCohortInfo(self):
         """
@@ -124,21 +150,14 @@ class FileManager:
         We build the dictionary simultaneously for consistency, so that the file and the dictionary are in sync.
         """
         # Get the list of all the cohort folder and sort by natural order
-        cohort_folders = FileManager.natural_sort([name for name in os.listdir(self.FILES['DATA']) if os.path.isdir(os.path.join(self.FILES['DATA'], name))])
+        cohort_folders = ListUtils.naturalSort([name for name in os.listdir(self.FILES['DATA']) if os.path.isdir(os.path.join(self.FILES['DATA'], name))])
         # Write the cohort names and their corresponding numbers to the cohorts file
         with open(self.FILES['COHORTS_FILE'], 'w') as f:
             for i, cohort in enumerate(cohort_folders):
                 f.write(f"{cohort},{i}\n")
         return {cohort: i for i, cohort in enumerate(cohort_folders)}
 
-    def getMatrix(file, delimiter=','):
-        """Takes a text file and returns a numpy matrix"""
-        # Force it to be 2D even if there's only one row
-        return np.atleast_2d(np.genfromtxt(file, delimiter=delimiter, dtype=int))
     
-    def writeMatrix(file, mat):
-        """Writes a numpy matrix to a text file. Don't write an extra line"""
-        np.savetxt(file, mat, delimiter=',', fmt='%d')
 
     def buildAnimalInfo(self, cohort_dict):
         """
@@ -155,11 +174,11 @@ class FileManager:
             for cohort_name, cohort_num in cohort_dict.items():
                 cohort_folder = os.path.join(self.FILES['DATA'], cohort_name)
                 info_file = os.path.join(cohort_folder, self.FILES['INFO_FILE'])
-                animal_files = FileManager.natural_sort([name for name in os.listdir(cohort_folder) if os.path.isfile(os.path.join(cohort_folder, name)) 
+                animal_files = ListUtils.naturalSort([name for name in os.listdir(cohort_folder) if os.path.isfile(os.path.join(cohort_folder, name)) 
                                                          and name != self.FILES['INFO_FILE'] 
                                                          and not name.startswith('.')])
                 all_paths += [os.path.join(cohort_folder, file) for file in animal_files]
-                animal_info_matrix = FileManager.getMatrix(info_file, delimiter='\t')
+                animal_info_matrix = FileUtils.getMatrix(info_file, delimiter='\t')
                 # Get rid of hidden files
                 animal_files = [file for file in animal_files if not file.startswith('.')]
                 assert len(animal_files) == len(animal_info_matrix)
@@ -167,25 +186,9 @@ class FileManager:
                     animal_info = animal_info_matrix[i]
                     f.write(f"{animal_num},{cohort_num},{','.join([str(int(x)) for x in animal_info])}\n")
                     animal_num += 1
-        FileManager.pickle_obj(all_paths, os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
+        FileUtils.pickleObj(all_paths, os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
 
-    def pickle_obj(obj, file):
-        with open(file, 'wb') as f:
-            pickle.dump(obj, f)
-
-    def unpickle_obj(file):
-        with open(file, 'rb') as f:
-            return pickle.load(f)
-        
-    def writeCBASFile(filepath, fileobj: CBASFile):
-        """Writes a CBASFile object to a file"""
-        with gzip.open(filepath, 'wb') as f:
-            pickle.dump(fileobj, f)
-        # FileManager.pickle_obj(fileobj, filepath)
-
-    def readCBASFile(filepath) -> CBASFile:
-        """Reads a CBASFile object from a file"""
-        return FileManager.unpickle_obj(filepath)
+    
 
     def clearMetadata(self):
         """
