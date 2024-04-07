@@ -78,6 +78,8 @@ def startCBASTerminal(num_samples):
     all_seq_cnts = sequencesProcessor.exportAllSeqCnts()
     print("Sequence and criterion files generated. Time taken: ", format_time(time.time() - section_start))
 
+    sequencesProcessor = None  # Clear memory
+
     print(divider)
     section_start = time.time()
     print("Grouping animals...")
