@@ -3,7 +3,7 @@ import numpy as np
 from random import choices
 import pandas as pd
 from settings import Settings
-from files import FileManager
+from utils import FileUtils
 import numpy as np
 import multiprocessing
 
@@ -67,12 +67,11 @@ class Resampler:
             Group 1 Averages ... Group n Averages, Original Sequence Number, Length, Contingency
         The rows are sequences, regardless of length and contingency.
         """
-        # Flatten groups and cross check with all_animals
         seq_num_col_name = "Original Seq No."
         seq_rates_df = pd.DataFrame()
         lengths, conts = self.all_seqcnts_matrix.shape
-        for length in np.arange(lengths):
-            for cont in np.arange(conts):
+        for cont in np.arange(conts):
+            for length in np.arange(lengths):
                 seq_cnts = pd.DataFrame(self.all_seqcnts_matrix[length][cont])
                 one_cont_one_len_df = pd.DataFrame()
                 for i, group in enumerate(groups):
@@ -123,7 +122,7 @@ class Resampler:
         if actual:
             return result
         else:
-            paired_result = [(idx, val) for idx, val in enumerate(result) if val > 0]
+            paired_result = [(idx, val, np.floor(idx / 2)) for idx, val in enumerate(result) if val > 0]
             return paired_result
     
     def getStudentizedTestStatsLoop(self, seq_rates_df: pd.DataFrame):
@@ -215,4 +214,4 @@ class Resampler:
         #             resampled_matrix, delimiter=',')
 
         # Pickle the resampled matrix
-        FileManager.pickle_obj(resampled_matrix, os.path.join(self.FILES['OUTPUT'], f'{filename}.pkl'))
+        FileUtils.pickleObj(resampled_matrix, os.path.join(self.FILES['OUTPUT'], f'{filename}.pkl'))

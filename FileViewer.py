@@ -15,6 +15,8 @@ import os
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtCore import Qt
 
+from utils import ListUtils
+
 class PandasTableModel(QAbstractTableModel): 
     def __init__(self, df=pd.DataFrame(), parent=None): 
         super().__init__(parent)
@@ -210,6 +212,9 @@ class PandasTable(QTableView):
         
 
 class FileViewer(QWidget, Ui_FileViewer):
+
+    supported_file_types = ['.cbas', '.txt', '.csv', '.pkl', '.npy']
+
     def __init__(self, parent=None):
         super(FileViewer, self).__init__(parent)
         self.setupUi(self)
@@ -222,7 +227,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.pd_table = None
 
         self.mapButtonActions()
-        self.fileTree.itemDoubleClicked.connect(self.openFile)
+        self.fileTree.itemDoubleClicked.connect(lambda item: self.fileTreeItemTriggered(item) if item.childCount() == 0 else None)
 
         self.setupFilterTable()
 
@@ -286,19 +291,12 @@ class FileViewer(QWidget, Ui_FileViewer):
     def refreshFileTree(self):
         """Refreshes the file tree view with the current directories."""
         self.fileTree.clear()
-        for directory in self.naturalSort(self.directories):
+        for directory in ListUtils.naturalSort(self.directories, key=lambda d: os.path.dirname(d)):
             if os.path.isdir(directory):
                 self.populateFileTree(directory, self.fileTree.invisibleRootItem())
             else:
                 pass
 
-    
-
-    def naturalSort(self, l):
-        """Sorts a list of strings in natural order."""
-        convert = lambda text: int(text) if text.isdigit() else text.lower()
-        alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-        return sorted(l, key=alphanum_key)
         
     def populateFileTree(self, base_path, parent_item):
         """
@@ -309,12 +307,12 @@ class FileViewer(QWidget, Ui_FileViewer):
         root_item.setText(0, os.path.basename(base_path))  # Set the text for the root item
         root_item.setIcon(0, QIcon("icons/folder.png"))
 
-        for item in self.naturalSort(os.listdir(base_path)):
+        for item in ListUtils.naturalSort(os.listdir(base_path)):
             item_path = os.path.join(base_path, item)
             if os.path.isdir(item_path):
                 # Recursively populate the tree view with the contents of the directory
                 self.populateFileTree(item_path, root_item)
-            elif os.path.isfile(item_path):
+            elif os.path.isfile(item_path) and item_path.endswith(tuple(self.supported_file_types)):
                 # Create a QTreeWidgetItem for files
                 file_item = QTreeWidgetItem(root_item)
                 file_item.setText(0, item)  # Set the text for the item
@@ -328,36 +326,45 @@ class FileViewer(QWidget, Ui_FileViewer):
         elif filename.startswith("allSeqAllAn"):
             return "allSeqAllAn"
         
-    def getColumnNames(self, filepath):
+    def getColumnNames(self, filepath, df):
         """Returns the column names of the file at the given path."""
         if self.fileType(filepath) == "animals":
             return ["Animal Number", "Cohort Number", "Animal Key", "Genotype", "Sex", "Lesion", "Implant"]
         elif self.fileType(filepath) == "allSeqAllAn":
             return ["Animal Number", "Trial Number", "Sequence Number"]
-        else: return [str(i) for i in range(len(self.df.columns))]
+        else: return [str(i) for i in range(len(df.columns))]
 
-    def openFile(self, item):
-        """Opens the file and displays it in the table view, replacing the current widget."""
-        if item.childCount() == 0:
-            filepath = item.data(0, Qt.ItemDataRole.UserRole)
-            if filepath not in self.open_files:
-                #TODO: Get rid of self.df
-                self.df = pd.read_csv(filepath, header=None)
-                self.df.columns = self.getColumnNames(filepath)
-                self.pd_table = PandasTable(self.df, self)
-                # New tab
-                self.open_files.add(filepath)
-                self.fileTabs.addTab(self.pd_table, os.path.basename(filepath))
-                self.pd_table.setProperty("filepath", filepath)
-                self.fileTabs.setCurrentWidget(self.pd_table)
-            else:
-                # Switch to the tab whose filepath matches the selected file
-                for i in range(self.fileTabs.count()):
-                    if self.fileTabs.widget(i).property("filepath") == filepath:
-                        self.fileTabs.setCurrentIndex(i)
-                        self.pd_table = self.fileTabs.currentWidget()
-                        break
-            self.actionsBox.setEnabled(len(self.open_files) > 0)
+    def fileTreeItemTriggered(self, item):
+        """Called when a file is double clicked in the file tree. Opens the file in the table view."""
+        filepath = item.data(0, Qt.ItemDataRole.UserRole)
+        if filepath not in self.open_files:
+            self.openFile(filepath)
+        else:
+            # Switch to the tab whose filepath matches the selected file
+            for i in range(self.fileTabs.count()):
+                if self.fileTabs.widget(i).property("filepath") == filepath:
+                    self.fileTabs.setCurrentIndex(i)
+                    self.pd_table = self.fileTabs.currentWidget()
+                    break
+        self.actionsBox.setEnabled(len(self.open_files) > 0)
+
+    def openFile(self, filepath):
+        """Opens the file at the given path and displays it in the table view."""
+        if filepath.endswith(".txt") or filepath.endswith(".csv"):
+            # Check if the file is tabular
+            try:
+                df = pd.read_csv(filepath, header=None)
+            except:
+                self.showError("Opening file", "File is not tabular in nature.")
+                return
+            #TODO: Get rid of self.df
+            df.columns = self.getColumnNames(filepath, df)
+            self.pd_table = PandasTable(df, self)
+            # New tab
+            self.open_files.add(filepath)
+            self.fileTabs.addTab(self.pd_table, os.path.basename(filepath))
+            self.pd_table.setProperty("filepath", filepath)
+            self.fileTabs.setCurrentWidget(self.pd_table)
 
     def currentFile(self):
         """Returns the filepath of the currently open file."""

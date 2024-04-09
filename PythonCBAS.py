@@ -83,7 +83,8 @@ def startCBASTerminal(num_samples):
     print(divider)
     section_start = time.time()
     print("Grouping animals...")
-    resampler = Resampler(settings, conts=[1])
+    conts = [int(cont) for cont in args.contingencies.split(",")] if args.contingencies != "all" else "all"
+    resampler = Resampler(settings, conts=conts)
     resampler.setAllSeqCntsMatrix(all_seq_cnts)
     resampler.assignGroups([{"GENOTYPE": 0, "LESION": 0}, {"GENOTYPE": 1, "LESION": 0}])
     print("Groups assigned:")
@@ -101,7 +102,7 @@ def startCBASTerminal(num_samples):
 
     print(divider)
     section_start = time.time()
-    print(f"Resampling {num_samples} times...")
+    print(f"Resampling {num_samples} times, considering contingencies {conts}...")
     resampled_matrix = resampler.generateResampledMatrixParallel(num_resamples=num_samples)
     print(f"Resampling finished. Time taken: ", format_time(time.time() - section_start))
     section_start = time.time()
@@ -147,9 +148,9 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.menubar = self.menuBar()
         self.menubar.setNativeMenuBar(False)  # For macOS
         self.actionGet_Sequences.triggered.connect(self.runCBAS)
-        self.actionDarkTheme.triggered.connect(lambda: qdarktheme.setup_theme("dark"))
+        self.actionDarkTheme.triggered.connect(lambda: qdarktheme.setup_theme("dark", additional_qss=qss))
         self.actionLightTheme.triggered.connect(lambda: qdarktheme.setup_theme("light"))
-        self.actionAutoTheme.triggered.connect(lambda: qdarktheme.setup_theme("auto"))
+        self.actionAutoTheme.triggered.connect(lambda: qdarktheme.setup_theme("auto", additional_qss=qss))
         self.actionImport_Data.triggered.connect(lambda: self.mainStack.setCurrentIndex(0))
         self.actionFile_Viewer.triggered.connect(lambda: self.mainStack.setCurrentIndex(1))
 
@@ -160,6 +161,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PythonCBAS")
     parser.add_argument("-s", "--sequence", help="Run sequencing in terminal mode", action="store_true")
     parser.add_argument("-n", "--num_samples", help="Number of samples to resample", type=int, default=0)
+    parser.add_argument("-c", "--contingencies", help="List of contingencies to include in the resampling, comma-separated", type=str, default="all")
     args = parser.parse_args()
 
     if args.sequence:

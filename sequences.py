@@ -423,21 +423,74 @@ class SequencesProcessor:
                                              f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.txt'), 
                                 self.criterion_matrix)
         
-    def buildAllSeqCnts(self):
+    def buildSeqNumIndex(self, all_seq_cnts):
         """
-        Concatenates all the sequence counts matrices into one big matrix
+        Builds a dictionary that maps sequence numbers to indices in the sequence counts matrix.
+        Right now the sequence counts matrix is constructed as such:
+
+                        Cont 0  Cont 1  Cont 2  ...  Cont m
+                   --                                         --
+            An0   |                                             |
+             .    |           - - -   Length 1   - - -          |
+           An244  |                                             |
+             .    |                      .                      |
+             .    |                      .                      |    
+             .    |                      .                      |
+            An0   |                                             |
+             .    |           - - -   Length n   - - -          |
+           An244  |                                             |
+                   --                                         --
+
+        And an indexing into the matrix would look like this:
+            all_seq_cnts[length][cont]
+
+        For the index mapping purposes, we will effectively flatten out the matrix like so:
+
+                        Cont 0                  Cont 1       ...        Cont m
+              --                                                                      --
+        An0  |                                                                          |
+         .   |     Len 1 ... Len n   ...   Len 1 ... Len n   ...   Len 1 ... Len n      |
+       An244 |                                                                          |
+              --                                                                      --
+
+        Now each column is a single sequence. We can now map a range of indices, which are our sequence numbers, to a contingency-length pair.
+        The mapping will look like this:
+
+            (start_idx, end_idx) -> (cont, length)
+
         """
-        pass
+        seq_num_index = {}
+        last_idx = 0
+        for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+            for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
+                seq_cnts = all_seq_cnts[length][cont]
+                col_cnt = seq_cnts.shape[1]
+                seq_num_index[(last_idx, last_idx + col_cnt - 1)] = (cont, length+1)
+                last_idx += col_cnt
+        return seq_num_index
+    
+    def locateSequenceNumber(seq_num_index, universal_seq_num):
+        """
+        Given a universal sequence number, return the contingency-length pair that the sequence number belongs to,
+        as well as which sequence number it is in that contingency-length pair.
+        """
+        for (start, end), (cont, length) in seq_num_index.items():
+            if start <= universal_seq_num <= end:
+                return (cont, length, universal_seq_num - start)
+        return None
+        
 
 
     def exportAllSeqCnts(self):
         """
         Creates a lengths x contingencies matrix that contains the sequence counts matrix for each length and contingency.
+        Also builds the sequence number index.
         """
         all_seq_cnts = np.zeros((self.LANGUAGE['MAX_SEQUENCE_LENGTH'], self.LANGUAGE['NUM_CONTINGENCIES']), dtype=object)
         for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
                 all_seq_cnts[length][cont] = self.sequence_matrix[length][cont].getSeqCounts()
+        self.buildSeqNumIndex(all_seq_cnts)  # Build the sequence number index)
         return all_seq_cnts
 
 

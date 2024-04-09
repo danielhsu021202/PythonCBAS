@@ -50,6 +50,7 @@ class StringUtils:
         """Returns a string with the elements of the string separated by 'and'."""
         return StringUtils.andSeparateList([s.strip() for s in string.split(",")], include_verb)
     
+    
 
 class FileUtils:
 
@@ -102,13 +103,43 @@ class MatrixUtils:
     def csrDecompress(csr_matrix: csr_matrix):
         """Decompresses a CSR matrix to a dense matrix."""
         return csr_matrix.toarray()
+    
+    def getRow(matrix, row):
+        """Returns the row of a matrix."""
+        return matrix[row]
+    
+    def getCol(matrix, col):
+        """Returns the column of a matrix."""
+        return matrix[:, col]
 
 
 
 class ListUtils:
 
-    def naturalSort(l):
+    def naturalSort(l, key=lambda x: x):
         """Sorts the given list in natural order."""
-        convert = lambda text: int(text) if text.isdigit() else text
-        alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-        return sorted(l, key=alphanum_key)
+        return sorted(l, key=lambda x: [int(c) if c.isdigit() else c for c in re.split('([0-9]+)', key(x))])
+    
+    def flatten(l):
+        """Flattens a list."""
+        return [item for sublist in l for item in sublist]
+    
+    def unique(l):
+        """Returns the unique elements of a list."""
+        return list(set(l))
+    
+    def count(l, item):
+        """Returns the number of occurrences of an item in a list."""
+        return l.count(item)
+    
+    def countUnique(l):
+        """Returns the number of unique elements in a list."""
+        return len(ListUtils.unique(l))
+    
+    def countAll(l):
+        """Returns a dictionary of the number of occurrences of each unique element in a list."""
+        return {item: l.count(item) for item in ListUtils.unique(l)}
+    
+    def countAllSorted(l):
+        """Returns a dictionary of the number of occurrences of each unique element in a list, sorted by the element."""
+        return {k: v for k, v in sorted(ListUtils.countAll(l).items())}
