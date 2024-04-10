@@ -60,7 +60,7 @@ class Resampler:
         return num_seqs
 
         
-    def getSequenceRates(self, groups: list[np.array]):
+    def getSequenceRatesVerbose(self, groups: list[np.array]):
         """
         Given a list of groups of sequences, returns the sequence rates for each group.
         The columns are:
@@ -102,88 +102,75 @@ class Resampler:
                 else:
                     seq_rates_df = pd.concat([seq_rates_df, one_cont_one_len_df], axis=0)
         return seq_rates_df
-    
-    def getStudentizedTestStatsVectorized(self, seq_rates_df: pd.DataFrame, actual=False):
-        """
-        Given a dataframe of sequence rates, returns the studentized test statistics for each sequence.
-        Mutates the input dataframe.
-        """
-        # Studentized Test Statistics
-        c1c2 = np.zeros_like(seq_rates_df['Group 1 Avg'])  # Initialize c1c2 with zeros
 
-        # Calculate c1c2 only when the standard deviation is defined and both are non-zero
-        valid_indices = (seq_rates_df['Group 1 Var'] > 0) & (seq_rates_df['Group 2 Var'] > 0)
-        c1c2[valid_indices] = (seq_rates_df['Group 1 Avg'][valid_indices] - seq_rates_df['Group 2 Avg'][valid_indices]) / np.sqrt(
-            (seq_rates_df['Group 1 Var'][valid_indices] / seq_rates_df['Group 1 N'][valid_indices]) +
-            (seq_rates_df['Group 2 Var'][valid_indices] / seq_rates_df['Group 2 N'][valid_indices])
-        )        
-        result = np.repeat(c1c2, 2)  # Repeat each element twice
-        result[1::2] *= -1  # Multiply every other element by -1
-        if actual:
-            return result
-        else:
-            paired_result = [(idx, val, np.floor(idx / 2)) for idx, val in enumerate(result) if val > 0]
-            return paired_result
-    
-    def getStudentizedTestStatsLoop(self, seq_rates_df: pd.DataFrame):
-        """
-        Given a dataframe of sequence rates, returns the studentized test statistics for each sequence.
-        Mutates the input dataframe.
-        """
-        # Studentized Test Statistics
-        c1c2 = np.zeros_like(seq_rates_df['Group 1 Avg'])  # Initialize c1c2 with zeros
-
-        # Calculate c1c2 only when the standard deviation is defined and both are non-zero
-        valid_indices = (seq_rates_df['Group 1 Var'] > 0) & (seq_rates_df['Group 2 Var'] > 0)
-        c1c2[valid_indices] = (seq_rates_df['Group 1 Avg'][valid_indices] - seq_rates_df['Group 2 Avg'][valid_indices]) / np.sqrt(
-            (seq_rates_df['Group 1 Var'][valid_indices] / seq_rates_df['Group 1 N'][valid_indices]) +
-            (seq_rates_df['Group 2 Var'][valid_indices] / seq_rates_df['Group 2 N'][valid_indices])
-        )
-
-        result = []
-        for c in c1c2:
-            result.extend([c, -c])
-        return result
+    def getStudentizedTestStats(self, groups: list[np.array]):
+        sts = None
+        lengths, conts = self.all_seqcnts_matrix.shape
+        for cont in np.arange(conts):
+            for length in np.arange(lengths):
+                seq_cnts = self.all_seqcnts_matrix[length][cont]
+                # Always 2 groups
+                # Group 1
+                seq_cnts_g1 = seq_cnts[groups[0]]
+                seq_cnts_g1 = seq_cnts_g1[~(seq_cnts_g1 == -1).any(axis=1)]
+                var1 = seq_cnts_g1.var(axis=0)
+                mean1 = seq_cnts_g1.mean(axis=0)
+                # Group 2
+                seq_cnts_g2 = seq_cnts[groups[1]]
+                seq_cnts_g2 = seq_cnts_g2[~(seq_cnts_g2 == -1).any(axis=1)]
+                var2 = seq_cnts_g2.var(axis=0)
+                mean2 = seq_cnts_g2.mean(axis=0)
+                # Studentized Test Statistic
+                valid_indices = (var1 > 0) & (var2 > 0)  # Only calculate when the standard deviation is defined and both are non-zero
+                c1c2 = np.zeros(seq_cnts.shape[1])  # Number of zeroes equal to the number of sequences
+                c1c2[valid_indices] = (mean1[valid_indices] - mean2[valid_indices]) / np.sqrt((var1[valid_indices] / seq_cnts_g1.shape[0]) + (var2[valid_indices] / seq_cnts_g2.shape[0]))
+                
+                result = np.repeat(c1c2, 2)
+                result[1::2] *= -1
+                if sts is None:
+                    sts = result
+                else:
+                    sts = np.hstack((sts, result))
+        return sts
     
     def resample(self, id=0):
         np.random.seed(self.seed + id)
         # Resample the groups
         resampled_groups = self.resampleGroups()
         # Calculate the studentized test statistics for the resampled groups
-        seq_rates_df = self.getSequenceRates(resampled_groups)
-        return self.getStudentizedTestStatsVectorized(seq_rates_df)
-    
-    def generateResampledMatrix(self, num_resamples=10000):
-        """
-        Gets the studentized test statistics for the original groups, 
-        then resamples the groups and calculates the studentized test statistics for each sequence.
-        """
-        resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
-        # First do it for the original groups
-        seq_rates_df = self.getSequenceRates(self.orig_groups)
-        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df, actual=True)
-
-        # Set the first row of the resampled_matrix
-        resampled_matrix[0] = studentized_test_stats
-
-        # Loop over the remaining rows
-        for i in range(1, num_resamples+1):
-            
-            # Set the i-th row of the resampled_matrix
-            resampled_matrix[i] = self.resample(i)
-
-        return resampled_matrix
+        return self.getStudentizedTestStats(resampled_groups)
     
     def generateResampledMatrixParallel(self, num_resamples=10000):
         """
         Gets the studentized test statistics for the original groups, 
         then resamples the groups and calculates the studentized test statistics for each sequence.
         """
-        # resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
+        # First do it for the original groups
+        reference_studentized_test_stats = self.getStudentizedTestStats(self.orig_groups)
+
+        # Create a pool of worker processes
+        pool = multiprocessing.Pool()
+        # Run self.sample() and append the result to resampled_matrix at the specified index
+        resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
+        resampled_matrix[0] = reference_studentized_test_stats
+        results = pool.map(self.resample, np.arange(1, num_resamples+1))
+        for i, result in enumerate(results):
+            resampled_matrix[i+1] = result
+            results[i] = None  # Remove the row from the results to free up memory
+        # Close the pool and wait for all processes to finish
+        pool.close()
+        pool.join()
+
+        return resampled_matrix
+    
+    def generateResampledMatrixParallelAbbrev(self, num_resamples=10000):
+        """
+        Gets the studentized test statistics for the original groups, 
+        then resamples the groups and calculates the studentized test statistics for each sequence.
+        """
         resampled_matrix = []
         # First do it for the original groups
-        seq_rates_df = self.getSequenceRates(self.orig_groups)
-        studentized_test_stats = self.getStudentizedTestStatsVectorized(seq_rates_df, actual=True)
+        studentized_test_stats = self.getStudentizedTestStats(self.orig_groups)
 
         # Set the first row of the resampled_matrix
         resampled_matrix.append(studentized_test_stats)

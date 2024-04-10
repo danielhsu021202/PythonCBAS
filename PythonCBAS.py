@@ -93,7 +93,7 @@ def startCBASTerminal(num_samples):
     print("Time taken: ", format_time(time.time() - section_start))
     section_start = time.time()
     print("Calculating sequence rates...")
-    seq_rates_matrix = resampler.getSequenceRates(resampler.orig_groups)
+    seq_rates_matrix = resampler.getSequenceRatesVerbose(resampler.orig_groups)
     print("Sequence rates calculated. Time taken: ", format_time(time.time() - section_start))
     section_start = time.time()
     print("Writing sequence rates to file...")
