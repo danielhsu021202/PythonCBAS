@@ -88,6 +88,7 @@ class FileUtils:
         else:
             with open(filepath, 'rb') as f:
                 return pickle.load(f)
+
             
 class MatrixUtils:
 
@@ -96,9 +97,9 @@ class MatrixUtils:
         sparsity = np.count_nonzero(matrix) / matrix.size
         return sparsity < threshold
     
-    def csrCompress(matrix):
+    def csrCompress(matrix, dtype):
         """Compresses a matrix to a CSR matrix."""
-        return csr_matrix(matrix)
+        return csr_matrix(matrix, dtype=dtype)
     
     def csrDecompress(csr_matrix: csr_matrix):
         """Decompresses a CSR matrix to a dense matrix."""

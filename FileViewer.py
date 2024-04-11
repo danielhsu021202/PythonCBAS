@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import QMenu
 from PyQt6.QtCore import Qt
 
 from utils import ListUtils
+from files import CBASFile
 
 class PandasTableModel(QAbstractTableModel): 
     def __init__(self, df=pd.DataFrame(), parent=None): 
@@ -357,14 +358,25 @@ class FileViewer(QWidget, Ui_FileViewer):
             except:
                 self.showError("Opening file", "File is not tabular in nature.")
                 return
-            #TODO: Get rid of self.df
             df.columns = self.getColumnNames(filepath, df)
             self.pd_table = PandasTable(df, self)
-            # New tab
-            self.open_files.add(filepath)
-            self.fileTabs.addTab(self.pd_table, os.path.basename(filepath))
-            self.pd_table.setProperty("filepath", filepath)
-            self.fileTabs.setCurrentWidget(self.pd_table)
+            
+        elif filepath.endswith(".cbas"):
+            cbas_file = CBASFile.loadFile(filepath)
+            data = cbas_file.data
+            if type(data) == pd.DataFrame:
+                data.columns = self.getColumnNames(filepath, data)
+                self.pd_table = PandasTable(data, self)
+            else:
+                df = pd.DataFrame(data)
+                df.columns = self.getColumnNames(filepath, df)
+                self.pd_table = PandasTable(df, self)
+        
+        # New tab
+        self.open_files.add(filepath)
+        self.fileTabs.addTab(self.pd_table, os.path.basename(filepath))
+        self.pd_table.setProperty("filepath", filepath)
+        self.fileTabs.setCurrentWidget(self.pd_table)
 
     def currentFile(self):
         """Returns the filepath of the currently open file."""

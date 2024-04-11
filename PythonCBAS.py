@@ -1,5 +1,6 @@
 from sequences import SequencesProcessor
 from resampler import Resampler
+from statistical_analyzer import StatisticalAnalyzer
 from files import FileManager
 from settings import Settings
 
@@ -76,9 +77,10 @@ def startCBASTerminal(num_samples):
     print("Generating sequence and criterion files...")
     sequencesProcessor.generateSequenceFiles()
     all_seq_cnts = sequencesProcessor.exportAllSeqCnts()
+    sequencesProcessor.buildSeqNumIndex(all_seq_cnts)
     print("Sequence and criterion files generated. Time taken: ", format_time(time.time() - section_start))
 
-    sequencesProcessor = None  # Clear memory
+    sequencesProcessor.dumpMemory()
 
     print(divider)
     section_start = time.time()
@@ -109,7 +111,17 @@ def startCBASTerminal(num_samples):
     print("Writing resampled matrix to file...")
     resampler.writeResampledMatrix(resampled_matrix, filename='resampled_mat_1000_samples_cont_1')
     print("Resampled matrix written to file. Time taken: ", format_time(time.time() - section_start))
-    
+
+    print(divider)
+    section_start = time.time()
+    print("Calculating p-values...")
+    stats_analyzer = StatisticalAnalyzer(resampled_matrix)
+    p_values = stats_analyzer.getPValuesFull(n=1, threshold=0.05)
+    print("P-value\Seq\tCont\tLen\tSequence Number")
+    for p_val, seq_num in p_values:
+        seq, cont, length, local_num = sequencesProcessor.getSequence(seq_num)
+        print(f"{np.round(p_val, 8)}: {seq}\t{cont}\t{length}\t{local_num}")
+    print("P-values calculated. Time taken: ", format_time(time.time() - section_start))
 
 
     

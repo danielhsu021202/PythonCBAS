@@ -99,7 +99,7 @@ class CBASFile:
     def getData(self):
         return self.data
 
-    def saveFile(self, location, use_sparsity_csr=False):
+    def saveFile(self, location, use_sparsity_csr=False, use_gzip=False, dtype=int):
         """Pickle this object to a file"""
         # Ensure valid directory
         if not os.path.exists(location):
@@ -110,13 +110,15 @@ class CBASFile:
         if use_sparsity_csr:
             assert type(self.data) == np.ndarray
             if MatrixUtils.isSparse(self.data):
-                self.data = MatrixUtils.csrCompress(self.data)
+                self.data = MatrixUtils.csrCompress(self.data, dtype)
                 self.compression = CBASFile.compression_formats['CSR']
             else:
                 self.compression = CBASFile.compression_formats['UNCOMPRESSED']
         else:
             self.compression = CBASFile.compression_formats['UNCOMPRESSED']
-        FileUtils.pickleObj(self, filepath)
+
+
+        FileUtils.pickleObj(self, filepath, compress=use_gzip)
 
     def loadFile(filepath):
         """Unpickle a file, decompress if necessary, and return the object"""

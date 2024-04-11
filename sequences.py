@@ -32,8 +32,6 @@ class SequenceManager:
 
         self.next_number = 0  # The next number to assign to a new sequence
 
-
-
         self.seq_nums = {}  # Maps sequences to numbers
         self.animal_trials = []  # This is a 2D array for allSeqAllAn
         self.seq_counts = np.zeros((1, 1)) # This is a 2D array for seqCnts
@@ -123,7 +121,9 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
-        FileUtils.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
+        cbas_file = CBASFile(f'allSeq_{cont}_{seq_len}', mat)
+        cbas_file.saveFile(FILES['ALLSEQDIR'])
+        # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
     
     def genAllSeqAllAnFile(self, FILES, cont, seq_len):
         """
@@ -131,16 +131,18 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array(self.animal_trials)
-        FileUtils.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
+        cbas_file = CBASFile(f'allSeqAllAn_{cont}_{seq_len}', mat)
+        cbas_file.saveFile(FILES['ALLSEQALLANDIR'])
+        # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
 
     def genSeqCntsFile(self, FILES, cont, seq_len):
         """
         Generate the seqCnts file for this sequence length and contingency.
         """
-        # name = f'seqCnts_{cont}_{seq_len}'
-        # cbasFile = CBASFile(name, self.seq_counts)
-        # cbasFile.saveFile(FILES['SEQCNTSDIR'])
-        FileUtils.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
+        name = f'seqCnts_{cont}_{seq_len}'
+        cbasFile = CBASFile(name, self.seq_counts)
+        cbasFile.saveFile(FILES['SEQCNTSDIR'], use_sparsity_csr=True, dtype=int)
+        # FileUtils.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
     
     def numUniqueSeqs(self):
         """Returns the largest sequence number registered."""
@@ -172,7 +174,15 @@ class SequencesProcessor:
         self.current_animal_num = self.CONSTANTS['NaN']
         self.total_animals = self.CONSTANTS['NaN']
 
+        self.seq_num_index = None  # This is initialized in the buildSeqNumIndex() function
+
         self.missing_contingencies = {}  # Maps contingency to a list of animals that did not participate in that contingency
+
+    def dumpMemory(self):
+        self.sequence_matrix = None
+        self.criterion_matrix = None
+        self.seq_rates_df = None
+        self.missing_contingencies = None
 
     def getSequenceManager(self, cont: int, length: int) -> SequenceManager:
         """
@@ -459,25 +469,36 @@ class SequencesProcessor:
             (start_idx, end_idx) -> (cont, length)
 
         """
-        seq_num_index = {}
+        self.seq_num_index = {}
         last_idx = 0
         for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
             for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
                 seq_cnts = all_seq_cnts[length][cont]
                 col_cnt = seq_cnts.shape[1]
-                seq_num_index[(last_idx, last_idx + col_cnt - 1)] = (cont, length+1)
+                self.seq_num_index[(last_idx, last_idx + col_cnt - 1)] = (cont, length+1)
                 last_idx += col_cnt
-        return seq_num_index
     
-    def locateSequenceNumber(seq_num_index, universal_seq_num):
+    def locateSequenceNumber(self, universal_seq_num):
         """
         Given a universal sequence number, return the contingency-length pair that the sequence number belongs to,
         as well as which sequence number it is in that contingency-length pair.
         """
-        for (start, end), (cont, length) in seq_num_index.items():
+        for (start, end), (cont, length) in self.seq_num_index.items():
             if start <= universal_seq_num <= end:
                 return (cont, length, universal_seq_num - start)
         return None
+    
+    def getSequence(self, index):
+        """
+        Given the location info, return the sequence corresponding to that location.
+        """
+        cont, length, seq_num = self.locateSequenceNumber(index)
+        # Look for the sequence in the file
+        file = CBASFile.loadFile(os.path.join(self.FILES['ALLSEQDIR'], f'allSeq_{cont}_{length}.cbas'))
+        mat = file.data
+        
+        # Get the seq_num'th row
+        return tuple(mat[seq_num]), cont, length, seq_num
         
 
 

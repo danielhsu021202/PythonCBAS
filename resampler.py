@@ -4,6 +4,7 @@ from random import choices
 import pandas as pd
 from settings import Settings
 from utils import FileUtils
+from files import CBASFile
 import numpy as np
 import multiprocessing
 
@@ -103,7 +104,11 @@ class Resampler:
                     seq_rates_df = pd.concat([seq_rates_df, one_cont_one_len_df], axis=0)
         return seq_rates_df
 
-    def getStudentizedTestStats(self, groups: list[np.array]):
+    def getStudentizedTestStats(self, groups: list[np.array], abbrev=False):
+        """
+        Generates one row of the resampled matrix.
+        Calculates the studentized test statistics for each sequence.
+        """
         sts = None
         lengths, conts = self.all_seqcnts_matrix.shape
         for cont in np.arange(conts):
@@ -131,14 +136,20 @@ class Resampler:
                     sts = result
                 else:
                     sts = np.hstack((sts, result))
-        return sts
+        if abbrev:
+            paired_result = [(idx, val) for idx, val in enumerate(sts) if val > 0]
+            return paired_result
+        else:
+            return sts
     
     def resample(self, id=0):
+        """Performs one resampling of the groups."""
         np.random.seed(self.seed + id)
         # Resample the groups
         resampled_groups = self.resampleGroups()
         # Calculate the studentized test statistics for the resampled groups
         return self.getStudentizedTestStats(resampled_groups)
+    
     
     def generateResampledMatrixParallel(self, num_resamples=10000):
         """
@@ -201,4 +212,6 @@ class Resampler:
         #             resampled_matrix, delimiter=',')
 
         # Pickle the resampled matrix
-        FileUtils.pickleObj(resampled_matrix, os.path.join(self.FILES['OUTPUT'], f'{filename}.pkl'))
+        cbas_file = CBASFile(filename, resampled_matrix)
+        cbas_file.saveFile(self.FILES['OUTPUT'], use_sparsity_csr=True, dtype=float)
+        # FileUtils.pickleObj(resampled_matrix, os.path.join(self.FILES['OUTPUT'], f'{filename}.pkl'))
