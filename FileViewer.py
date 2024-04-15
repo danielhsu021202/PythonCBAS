@@ -99,6 +99,7 @@ class PandasTable(QTableView):
         menu = QMenu()
         sortAscendingAction = menu.addAction("Sort Ascending",)
         sortDescendingAction = menu.addAction("Sort Descending")
+        
         sumAction = menu.addAction("Sum")
         averageAction = menu.addAction("Average")
         medianAction = menu.addAction("Median")
@@ -166,6 +167,8 @@ class PandasTable(QTableView):
             # Summon the filter dialog, passing in the name of the column being called
             self.parent.addStage(col=self.df.columns[self.columnAt(pos.x())])
 
+    def getDF(self):
+        return self.df
 
     def filterTable(self, query):
         self.df.query(query, inplace=True)
@@ -225,7 +228,6 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.open_files = set()
 
         self.refreshFileTree()
-        self.pd_table = None
 
         self.mapButtonActions()
         self.fileTree.itemDoubleClicked.connect(lambda item: self.fileTreeItemTriggered(item) if item.childCount() == 0 else None)
@@ -254,17 +256,18 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.filterTable.customContextMenuRequested.connect(self.displayFilterContextMenu)
 
     def tableAction(self, action):
-        if self.pd_table is None:
+        pd_table = self.fileTabs.currentWidget()
+        if pd_table is None:
             self.functionTerminal.appendPlainText("No file selected.")
             return
         if action == "count_rows":
-            self.pd_table.countRows()
+            pd_table.countRows()
         elif action == "count_columns":
-            self.pd_table.countColumns()
+            pd_table.countColumns()
         elif action == "transpose":
-            self.pd_table.transpose()
+            pd_table.transpose()
         elif action == "count_nan":
-            self.pd_table.countNaN()
+            pd_table.countNaN()
 
 
     def displayFilterContextMenu(self, pos):
@@ -326,13 +329,18 @@ class FileViewer(QWidget, Ui_FileViewer):
             return "animals"
         elif filename.startswith("allSeqAllAn"):
             return "allSeqAllAn"
+        elif filename.startswith("seqRates"):
+            return "seqRates"
         
     def getColumnNames(self, filepath, df):
         """Returns the column names of the file at the given path."""
-        if self.fileType(filepath) == "animals":
+        filetype = self.fileType(filepath)
+        if filetype == "animals":
             return ["Animal Number", "Cohort Number", "Animal Key", "Genotype", "Sex", "Lesion", "Implant"]
-        elif self.fileType(filepath) == "allSeqAllAn":
+        elif filetype == "allSeqAllAn":
             return ["Animal Number", "Trial Number", "Sequence Number"]
+        elif filetype == "seqRates":
+            return ["Original Seq No.", "Group 1 Mean", "Group 1 Var", "N1", "Group 2 Mean", "Group 2 Var", "N2", "Cont", "Len", "STS 1", "STS 2"]
         else: return [str(i) for i in range(len(df.columns))]
 
     def fileTreeItemTriggered(self, item):
@@ -345,12 +353,12 @@ class FileViewer(QWidget, Ui_FileViewer):
             for i in range(self.fileTabs.count()):
                 if self.fileTabs.widget(i).property("filepath") == filepath:
                     self.fileTabs.setCurrentIndex(i)
-                    self.pd_table = self.fileTabs.currentWidget()
                     break
         self.actionsBox.setEnabled(len(self.open_files) > 0)
 
     def openFile(self, filepath):
         """Opens the file at the given path and displays it in the table view."""
+        pd_table = None
         if filepath.endswith(".txt") or filepath.endswith(".csv"):
             # Check if the file is tabular
             try:
@@ -359,30 +367,42 @@ class FileViewer(QWidget, Ui_FileViewer):
                 self.showError("Opening file", "File is not tabular in nature.")
                 return
             df.columns = self.getColumnNames(filepath, df)
-            self.pd_table = PandasTable(df, self)
+            pd_table = PandasTable(df, self)
             
         elif filepath.endswith(".cbas"):
             cbas_file = CBASFile.loadFile(filepath)
             data = cbas_file.data
             if type(data) == pd.DataFrame:
                 data.columns = self.getColumnNames(filepath, data)
-                self.pd_table = PandasTable(data, self)
+                pd_table = PandasTable(data, self)
             else:
                 df = pd.DataFrame(data)
                 df.columns = self.getColumnNames(filepath, df)
-                self.pd_table = PandasTable(df, self)
+                pd_table = PandasTable(df, self)
         
         # New tab
         self.open_files.add(filepath)
-        self.fileTabs.addTab(self.pd_table, os.path.basename(filepath))
-        self.pd_table.setProperty("filepath", filepath)
-        self.fileTabs.setCurrentWidget(self.pd_table)
+        self.fileTabs.addTab(pd_table, os.path.basename(filepath))
+        pd_table.setProperty("filepath", filepath)
+        self.fileTabs.setCurrentWidget(pd_table)
 
     def currentFile(self):
         """Returns the filepath of the currently open file."""
         if len(self.open_files) == 0:
             return None
         return self.fileTabs.currentWidget().property("filepath")
+    
+    def currentPDTable(self) -> PandasTable:
+        """Returns the currently open PandasTable."""
+        if len(self.open_files) == 0:
+            return None
+        return self.fileTabs.currentWidget()
+    
+    def currentPDTableDF(self) -> pd.DataFrame:
+        """Returns the currently open PandasTable's DataFrame."""
+        if len(self.open_files) == 0:
+            return None
+        return self.currentPDTable().getDF()
 
     def closeFile(self, index):
         """Closes the file at the given index."""
@@ -405,11 +425,13 @@ class FileViewer(QWidget, Ui_FileViewer):
         
 
     def applyStageNow(self, stage_tuple):
-        query, message = PipelineDialog.parseStage(stage_tuple, self.getColumnNames(self.currentFile()), self)
+        query, message = PipelineDialog.parseStage(stage_tuple, self.getColumnNames(self.currentFile(), self.currentPDTableDF()), self)
         if query is None:
             return
-        self.pd_table.filterTable(query)
-        self.functionTerminal.appendPlainText(message)
+        if self.currentPDTable():
+            self.currentPDTable().filterTable(query)
+            self.functionTerminal.appendPlainText(message)
+
 
     def applyFilters(self):
         if self.currentFile() is None:
@@ -417,13 +439,13 @@ class FileViewer(QWidget, Ui_FileViewer):
             return
         queries_and_messages = []
         for i in range(self.filterTable.rowCount()):
-            query, message = PipelineDialog.parseStage(self.filterTable.item(i, 0).data(Qt.ItemDataRole.UserRole), self.getColumnNames(self.currentFile()), self)
+            query, message = PipelineDialog.parseStage(self.filterTable.item(i, 0).data(Qt.ItemDataRole.UserRole), self.getColumnNames(self.currentFile(), self.currentPDTableDF()), self)
             if query is None:
                 return
             queries_and_messages.append(query)
         # Apply the filters
         for query, message in queries_and_messages:
-            self.pd_table.filterTable(query)
+            self.currentPDTable().filterTable(query)
             self.functionTerminal.appendPlainText(message)
 
 

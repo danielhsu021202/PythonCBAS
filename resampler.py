@@ -28,6 +28,7 @@ class Resampler:
             self.all_seqcnts_matrix = all_seqcnts_matrix
         else:
             self.all_seqcnts_matrix = all_seqcnts_matrix[:, self.conts]
+        
 
     def assignGroups(self, filters: list[dict]):
         """Assigns animals to groups based on the filters provided."""
@@ -94,7 +95,7 @@ class Resampler:
                         one_cont_one_len_df = pd.merge(one_cont_one_len_df, seq_cnts_g, on=seq_num_col_name)
                 
                 # Add the contingency and length columns
-                one_cont_one_len_df['Contingency'] = cont
+                one_cont_one_len_df['Contingency'] = self.conts[cont] if self.conts != 'all' else cont
                 one_cont_one_len_df['Length'] = length + 1
 
                 # Vertical stack the new dataframe to the sequence rates dataframe
@@ -102,7 +103,60 @@ class Resampler:
                     seq_rates_df = one_cont_one_len_df
                 else:
                     seq_rates_df = pd.concat([seq_rates_df, one_cont_one_len_df], axis=0)
+
+        # Studentized Test Statistic
+        valid_indices = (seq_rates_df['Group 1 Var'] > 0) & (seq_rates_df['Group 2 Var'] > 0)  # Only calculate when the standard deviation is defined and both are non-zero
+        c1c2 = np.zeros(seq_rates_df.shape[0])  # Number of zeroes equal to the number of sequences
+        c1c2[valid_indices] = (seq_rates_df['Group 1 Avg'][valid_indices] - seq_rates_df['Group 2 Avg'][valid_indices]) / np.sqrt((seq_rates_df['Group 1 Var'][valid_indices] / seq_rates_df['Group 1 N'][valid_indices]) + (seq_rates_df['Group 2 Var'][valid_indices] / seq_rates_df['Group 2 N'][valid_indices]))
+        seq_rates_df['Studentized Test Statistic 1'] = c1c2
+        seq_rates_df['Studentized Test Statistic 2'] = -c1c2
         return seq_rates_df
+    
+    def getStudentizedTestStatsPD(self, groups: list[np.array]):
+        """
+        Given a list of groups of sequences, returns the sequence rates for each group.
+        The columns are:
+            Group 1 Averages ... Group n Averages, Original Sequence Number, Length, Contingency
+        The rows are sequences, regardless of length and contingency.
+        """
+        seq_num_col_name = "Original Seq No."
+        seq_rates_df = pd.DataFrame()
+        lengths, conts = self.all_seqcnts_matrix.shape
+        for cont in np.arange(conts):
+            for length in np.arange(lengths):
+                seq_cnts = pd.DataFrame(self.all_seqcnts_matrix[length][cont])
+                one_cont_one_len_df = pd.DataFrame()
+                for i, group in enumerate(groups):
+                    seq_cnts_g = seq_cnts.iloc[group]  # Keep only the animals (rows) that are in the group
+                    seq_cnts_g = seq_cnts_g.loc[~(seq_cnts_g == self.CONSTANTS['NaN']).any(axis=1)]  # Remove animals (rows) with -1 (NaN) in the sequence counts
+                    seq_cnts_g = seq_cnts_g.T  # Transpose so that sequences are rows and animals are columns
+                    variance = seq_cnts_g.var(axis=1)  # Calculate the variance of the sequence counts (each row) for each sequence
+                    n = seq_cnts_g.shape[1]  # Number of animals in the group
+                    seq_cnts_g = seq_cnts_g.mean(axis=1)  # Average the sequence counts (each row) for each sequence
+                    seq_cnts_g = seq_cnts_g.reset_index()
+                    seq_cnts_g.columns = [seq_num_col_name, f'Group {i+1} Avg']
+                    seq_cnts_g[f'Group {i+1} Var'] = variance
+                    seq_cnts_g[f'Group {i+1} N'] = n # Number of animals in the group
+
+                    # Combine the dataframes from each group
+                    if one_cont_one_len_df.empty:
+                        one_cont_one_len_df = seq_cnts_g
+                    else:
+                        one_cont_one_len_df = pd.merge(one_cont_one_len_df, seq_cnts_g, on=seq_num_col_name)
+
+                # Vertical stack the new dataframe to the sequence rates dataframe
+                if seq_rates_df.empty:
+                    seq_rates_df = one_cont_one_len_df
+                else:
+                    seq_rates_df = pd.concat([seq_rates_df, one_cont_one_len_df], axis=0)
+
+        # Studentized Test Statistic
+        valid_indices = (seq_rates_df['Group 1 Var'] > 0) & (seq_rates_df['Group 2 Var'] > 0)  # Only calculate when the standard deviation is defined and both are non-zero
+        c1c2 = np.zeros(seq_rates_df.shape[0])  # Number of zeroes equal to the number of sequences
+        c1c2[valid_indices] = (seq_rates_df['Group 1 Avg'][valid_indices] - seq_rates_df['Group 2 Avg'][valid_indices]) / np.sqrt((seq_rates_df['Group 1 Var'][valid_indices] / seq_rates_df['Group 1 N'][valid_indices]) + (seq_rates_df['Group 2 Var'][valid_indices] / seq_rates_df['Group 2 N'][valid_indices]))
+        result = np.repeat(c1c2, 2)
+        result[1::2] *= -1
+        return result
 
     def getStudentizedTestStats(self, groups: list[np.array], abbrev=False):
         """
@@ -117,19 +171,22 @@ class Resampler:
                 # Always 2 groups
                 # Group 1
                 seq_cnts_g1 = seq_cnts[groups[0]]
-                seq_cnts_g1 = seq_cnts_g1[~(seq_cnts_g1 == -1).any(axis=1)]
+                seq_cnts_g1 = seq_cnts_g1[~(seq_cnts_g1 == self.CONSTANTS['NaN']).any(axis=1)]
+                n1 = seq_cnts_g1.shape[0]
                 var1 = seq_cnts_g1.var(axis=0)
                 mean1 = seq_cnts_g1.mean(axis=0)
                 # Group 2
                 seq_cnts_g2 = seq_cnts[groups[1]]
-                seq_cnts_g2 = seq_cnts_g2[~(seq_cnts_g2 == -1).any(axis=1)]
+                seq_cnts_g2 = seq_cnts_g2[~(seq_cnts_g2 == self.CONSTANTS['NaN']).any(axis=1)]
+                n2 = seq_cnts_g2.shape[0]
                 var2 = seq_cnts_g2.var(axis=0)
                 mean2 = seq_cnts_g2.mean(axis=0)
                 # Studentized Test Statistic
                 valid_indices = (var1 > 0) & (var2 > 0)  # Only calculate when the standard deviation is defined and both are non-zero
-                c1c2 = np.zeros(seq_cnts.shape[1])  # Number of zeroes equal to the number of sequences
-                c1c2[valid_indices] = (mean1[valid_indices] - mean2[valid_indices]) / np.sqrt((var1[valid_indices] / seq_cnts_g1.shape[0]) + (var2[valid_indices] / seq_cnts_g2.shape[0]))
+                c1c2 = np.zeros(len(mean1))
+                c1c2[valid_indices] = (mean1[valid_indices] - mean2[valid_indices]) / np.sqrt((var1[valid_indices] / n1) + (var2[valid_indices] / n2))
                 
+
                 result = np.repeat(c1c2, 2)
                 result[1::2] *= -1
                 if sts is None:
@@ -148,7 +205,7 @@ class Resampler:
         # Resample the groups
         resampled_groups = self.resampleGroups()
         # Calculate the studentized test statistics for the resampled groups
-        return self.getStudentizedTestStats(resampled_groups)
+        return self.getStudentizedTestStatsPD(resampled_groups)
     
     
     def generateResampledMatrixParallel(self, num_resamples=10000):
@@ -157,7 +214,7 @@ class Resampler:
         then resamples the groups and calculates the studentized test statistics for each sequence.
         """
         # First do it for the original groups
-        reference_studentized_test_stats = self.getStudentizedTestStats(self.orig_groups)
+        reference_studentized_test_stats = self.getStudentizedTestStatsPD(self.orig_groups)
 
         # Create a pool of worker processes
         pool = multiprocessing.Pool()
@@ -201,9 +258,10 @@ class Resampler:
 
     def writeSequenceRatesFile(self, seq_rates_df: pd.DataFrame):
         # Write the sequence rates matrix to a file
-        seq_rates_df.to_csv(os.path.join(self.FILES['OUTPUT'],
-                                                f'seqRates_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.csv'), 
-                                    index=False)
+        # Get the matrix without its column header
+        mat = seq_rates_df.to_numpy()
+        seq_rates_f = CBASFile("seqRates", mat)
+        seq_rates_f.saveFile(self.FILES['OUTPUT'])
         
     def writeResampledMatrix(self, resampled_matrix, filename='resampled_matrix'):
         # Write the resampled matrix to a file

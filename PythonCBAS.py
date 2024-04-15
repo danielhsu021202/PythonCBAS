@@ -21,6 +21,9 @@ from ui.MainWindow import Ui_MainWindow
 
 from FileViewer import FileViewer
 
+from utils import FileUtils
+from files import CBASFile
+
 import datetime
 
 def format_time(seconds):
@@ -56,6 +59,7 @@ def startCBASTerminal(num_samples):
             Number {CRITERION['NUMBER']}, 
             {'Include' if CRITERION['INCLUDE_FAILED'] else 'Exclude'} Failed, 
             {'' if CRITERION['ALLOW_REDEMPTION'] else "Don't "}Allow Redemption''')
+    conts = [int(cont) for cont in args.contingencies.split(",")] if args.contingencies != "all" else "all"
     print("Settings retrieved. Time taken: ", format_time(time.time() - section_start))
 
     print(divider)
@@ -76,8 +80,7 @@ def startCBASTerminal(num_samples):
     section_start = time.time()
     print("Generating sequence and criterion files...")
     sequencesProcessor.generateSequenceFiles()
-    all_seq_cnts = sequencesProcessor.exportAllSeqCnts()
-    sequencesProcessor.buildSeqNumIndex(all_seq_cnts)
+    all_seq_cnts = sequencesProcessor.exportAllSeqCnts(conts)
     print("Sequence and criterion files generated. Time taken: ", format_time(time.time() - section_start))
 
     sequencesProcessor.dumpMemory()
@@ -85,7 +88,8 @@ def startCBASTerminal(num_samples):
     print(divider)
     section_start = time.time()
     print("Grouping animals...")
-    conts = [int(cont) for cont in args.contingencies.split(",")] if args.contingencies != "all" else "all"
+    
+    
     resampler = Resampler(settings, conts=conts)
     resampler.setAllSeqCntsMatrix(all_seq_cnts)
     resampler.assignGroups([{"GENOTYPE": 0, "LESION": 0}, {"GENOTYPE": 1, "LESION": 0}])
@@ -116,12 +120,29 @@ def startCBASTerminal(num_samples):
     section_start = time.time()
     print("Calculating p-values...")
     stats_analyzer = StatisticalAnalyzer(resampled_matrix)
-    p_values = stats_analyzer.getPValuesFull(n=1, threshold=0.05)
-    print("P-value\Seq\tCont\tLen\tSequence Number")
+    # p_values = stats_analyzer.getPValuesFull(k=1, alpha=0.05)
+
+    
+
+    p_values, k = stats_analyzer.fdpControl(alpha=0.5, gamma=0.05, abbreviated=False)
+    
+    print(f"Stopped at k={k}")
+    print("P-values calculated. Time taken: ", format_time(time.time() - section_start))
+
+    section_start = time.time()
+    print("Writing significant sequences to file...")
+
+    p_val_mat = []
     for p_val, seq_num in p_values:
         seq, cont, length, local_num = sequencesProcessor.getSequence(seq_num)
-        print(f"{np.round(p_val, 8)}: {seq}\t{cont}\t{length}\t{local_num}")
-    print("P-values calculated. Time taken: ", format_time(time.time() - section_start))
+        p_val_mat.append([p_val, seq, cont, length, local_num])
+    p_val_mat = np.array(p_val_mat, dtype=object)
+    p_val_file = CBASFile("significant_sequences", p_val_mat)
+    p_val_file.saveFile(settings.getFiles()['OUTPUT'])
+
+    print(f"Significant sequences written to file. {len(p_val_mat)} sequences found. \nTime taken: ", format_time(time.time() - section_start))
+
+    
 
 
     

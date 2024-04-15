@@ -140,7 +140,7 @@ class SequenceManager:
         Generate the seqCnts file for this sequence length and contingency.
         """
         name = f'seqCnts_{cont}_{seq_len}'
-        cbasFile = CBASFile(name, self.seq_counts)
+        cbasFile = CBASFile(name, self.seq_counts.astype(int))
         cbasFile.saveFile(FILES['SEQCNTSDIR'], use_sparsity_csr=True, dtype=int)
         # FileUtils.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
     
@@ -433,7 +433,7 @@ class SequencesProcessor:
                                              f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.txt'), 
                                 self.criterion_matrix)
         
-    def buildSeqNumIndex(self, all_seq_cnts):
+    def buildSeqNumIndex(self, all_seq_cnts, conts='all'):
         """
         Builds a dictionary that maps sequence numbers to indices in the sequence counts matrix.
         Right now the sequence counts matrix is constructed as such:
@@ -468,15 +468,21 @@ class SequencesProcessor:
 
             (start_idx, end_idx) -> (cont, length)
 
+        To consider only a subset of contingencies, can pass in only the sequence counts with the desired contingencies.
         """
         self.seq_num_index = {}
         last_idx = 0
-        for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+        if conts == 'all':
+            conts = np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])
+        for cont in conts:
             for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
                 seq_cnts = all_seq_cnts[length][cont]
                 col_cnt = seq_cnts.shape[1]
                 self.seq_num_index[(last_idx, last_idx + col_cnt - 1)] = (cont, length+1)
                 last_idx += col_cnt
+
+        for (start, end), (cont, length) in self.seq_num_index.items():
+            print(f"({start}, {end}) -> ({cont}, {length})")
     
     def locateSequenceNumber(self, universal_seq_num):
         """
@@ -502,16 +508,19 @@ class SequencesProcessor:
         
 
 
-    def exportAllSeqCnts(self):
+    def exportAllSeqCnts(self, conts='all'):
         """
         Creates a lengths x contingencies matrix that contains the sequence counts matrix for each length and contingency.
         Also builds the sequence number index.
         """
+        if conts == 'all':
+            conts = np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])
         all_seq_cnts = np.zeros((self.LANGUAGE['MAX_SEQUENCE_LENGTH'], self.LANGUAGE['NUM_CONTINGENCIES']), dtype=object)
-        for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
-            for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+        
+        for cont in conts:
+            for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
                 all_seq_cnts[length][cont] = self.sequence_matrix[length][cont].getSeqCounts()
-        self.buildSeqNumIndex(all_seq_cnts)  # Build the sequence number index)
+        self.buildSeqNumIndex(all_seq_cnts, conts)
         return all_seq_cnts
 
 
