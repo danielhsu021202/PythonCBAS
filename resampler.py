@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from random import choices
+from random import choices, seed
 import pandas as pd
 from settings import Settings
 from utils import FileUtils
@@ -44,8 +44,9 @@ class Resampler:
         self.orig_groups = an_nums
         self.all_animals = [animal for group in self.orig_groups for animal in group]
     
-    def resampleGroups(self):
+    def resampleGroups(self, id):
         """Resamples the groups to create new groups of animals."""
+        seed(int(id))
         new_groups = []
         for group in self.orig_groups:
             new_group = choices(self.all_animals, k=len(group))
@@ -201,9 +202,8 @@ class Resampler:
     
     def resample(self, id=0):
         """Performs one resampling of the groups."""
-        np.random.seed(self.seed + id)
         # Resample the groups
-        resampled_groups = self.resampleGroups()
+        resampled_groups = self.resampleGroups(id)
         # Calculate the studentized test statistics for the resampled groups
         return self.getStudentizedTestStatsPD(resampled_groups)
     

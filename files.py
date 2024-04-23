@@ -208,8 +208,8 @@ class FileManager:
         Then processes the cohort and animal information and writes it to the metadata files.
         """
         # Clear output directory
-        if os.path.exists(self.FILES['OUTPUT']):
-            os.system(f"rm -r {self.FILES['OUTPUT']}")
+        # if os.path.exists(self.FILES['OUTPUT']):
+        #     os.system(f"rm -r {self.FILES['OUTPUT']}")
 
         Path(self.FILES['METADATA']).mkdir(parents=True, exist_ok=True)
         self.clearMetadata()

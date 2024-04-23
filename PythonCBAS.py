@@ -113,16 +113,20 @@ def startCBASTerminal(num_samples):
     print(f"Resampling finished. Time taken: ", format_time(time.time() - section_start))
     section_start = time.time()
     print("Writing resampled matrix to file...")
-    resampler.writeResampledMatrix(resampled_matrix, filename='resampled_mat_1000_samples_cont_1')
+    cont_str = "all" if conts == "all" else "_".join([str(cont) for cont in conts])
+    resampler.writeResampledMatrix(resampled_matrix, filename=f'resampled_mat_{num_samples}_samples_cont_{cont_str}')
     print("Resampled matrix written to file. Time taken: ", format_time(time.time() - section_start))
+
+
 
     print(divider)
     section_start = time.time()
     print("Calculating p-values...")
     stats_analyzer = StatisticalAnalyzer(resampled_matrix)
-    # p_values = stats_analyzer.getPValuesFull(k=1, alpha=0.05)
-
-    
+    # p_values = stats_analyzer.getPValuesFullParallel(k=2, alpha=0.05)
+    # print(p_values)
+    # print("P-values calculated. Time taken: ", format_time(time.time() - section_start))
+    # sys.exit()
 
     p_values, k = stats_analyzer.fdpControl(alpha=0.5, gamma=0.05, abbreviated=False)
     
@@ -142,15 +146,9 @@ def startCBASTerminal(num_samples):
 
     print(f"Significant sequences written to file. {len(p_val_mat)} sequences found. \nTime taken: ", format_time(time.time() - section_start))
 
-    
-
-
-    
-
-    
-
     print(divider)
     print(f"Total Time: {format_time(time.time() - start)}")
+    sys.exit()
 
 
 class PythonCBAS(QMainWindow, Ui_MainWindow):
