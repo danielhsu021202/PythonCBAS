@@ -1,0 +1,553 @@
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QTextEdit, QListWidgetItem, QFileDialog, QTableWidget, QLabel, QTableWidgetItem, QMessageBox, QDialog, QMenu, QPushButton, QLineEdit
+from PyQt6.QtGui import QIcon, QCursor
+from PyQt6.QtCore import Qt
+
+import os
+import sys
+
+from utils import ListUtils, FileUtils
+
+from ui.ImportDataDialog import Ui_ImportDataDialog
+
+class ColumnSelectTable(QTableWidget):
+    def __init__(self, file, delimiter, mode, parent=None):
+        super().__init__(parent)
+        self.editable = False
+
+        self.file = file
+        self.mat = FileUtils.getMatrix(file, delimiter=delimiter, limit_rows=100)
+        
+
+        # Populate the table with the matrix, with column headers as indices
+        self.setColumnCount(self.mat.shape[1])
+        self.setRowCount(self.mat.shape[0])
+        self.setHorizontalHeaderLabels([str(i) for i in range(self.mat.shape[1])])
+        self.setVerticalHeaderLabels([str(i) for i in range(self.mat.shape[0])])
+
+        self.columns = {i: None for i in range(self.columnCount())}
+
+        for i in range(self.mat.shape[0]):
+            for j in range(self.mat.shape[1]):
+                self.setItem(i, j, QTableWidgetItem(str(self.mat[i, j])))
+
+        # Context Menu
+        self.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        if mode == 'info':
+            self.horizontalHeader().customContextMenuRequested.connect(self.onColumnRightClickedInfo)
+        elif mode == 'data':
+            self.horizontalHeader().customContextMenuRequested.connect(self.onColumnRightClickedData)
+
+
+
+    
+    def onColumnRightClickedInfo(self, pos):
+        """Display a context menu when a column is right clicked. For labeling subject info files."""
+        menu = QMenu(self)
+        labelAction = menu.addAction("Label Column")
+        setCovariate = menu.addAction("Set Covariate")
+        menu.addSeparator()
+        resetAction = menu.addAction("Reset Column")
+
+        action = menu.exec(self.mapToGlobal(pos))
+        column_idx = self.columnAt(pos.x())
+        if action == labelAction:
+            self.labelColumn(column_idx)
+        elif action == setCovariate:
+           # If the covariate column already exists, reset that one first
+            for idx, label in self.columns.items():
+                print(idx, label)
+                if label == "Covariate":
+                    self.resetColumn(idx)
+                    break
+            self.setHorizontalHeaderItem(column_idx, QTableWidgetItem("Covariate"))
+            self.columns[column_idx] = "Covariate"
+        elif action == resetAction:
+            self.resetColumn(column_idx)
+
+    
+    def onColumnRightClickedData(self, pos):
+        """Display a context menu when a column is right clicked. For labeling subject data files."""
+        column_labels = self.columns.values()
+        column_idx = self.columnAt(pos.x())
+        menu = QMenu(self)
+        if "Session" not in column_labels:        menu.addAction("Session")
+        if "Contingency" not in column_labels:    menu.addAction("Contingency")
+        if "Choice" not in column_labels:         menu.addAction("Choice")
+        if "Modifier" not in column_labels:       menu.addAction("Modifier")
+        menu.addSeparator()
+        resetAction = menu.addAction("Reset Column")
+
+        action = menu.exec(self.mapToGlobal(pos))
+        if action is None: return
+        if action != resetAction:
+            self.columns[column_idx] = action.text()
+            self.setHorizontalHeaderItem(column_idx, QTableWidgetItem(self.columns[column_idx]))
+        else:
+            self.resetColumn(column_idx)
+
+    def resetColumn(self, column_idx):
+        """Reset the selected column."""
+        self.columns[column_idx] = None
+        self.setHorizontalHeaderItem(column_idx, QTableWidgetItem(str(column_idx)))
+
+
+    def labelColumn(self, column_idx):
+        """Label the selected column."""
+        # Spawn a simple two button dialog
+        column_label = self.labelColumnDialog(column_idx)
+        if column_label and not column_label.isspace():
+            if column_label == "Covariate":
+                QMessageBox.warning(self, "Warning", "The label 'Covariate' is reserved for covariates. Please choose another label.")
+                return
+            if column_label in self.columns.values():
+                QMessageBox.warning(self, "Warning", f"A column labled '{column_label}' already exists.")
+                return
+            self.setHorizontalHeaderItem(column_idx, QTableWidgetItem(column_label))
+            self.columns[column_idx] = column_label
+
+
+    def labelColumnDialog(self, column_idx):
+        """Dialog to input a label for the column."""
+        # Spawn a simple two button dialog
+        dialog = QDialog()
+        dialog.setWindowTitle(f"Label Column {column_idx}")
+        dialog.resize(200, 110)
+        
+        layout = QVBoxLayout()
+
+        label = QLabel(f"Label column {column_idx}:")
+
+        line_edit = QLineEdit()
+        line_edit.setPlaceholderText("Column Label")
+
+        done = QPushButton("Done")
+        done.clicked.connect(lambda: dialog.close())
+        
+        layout.addWidget(label)
+        layout.addWidget(line_edit)
+        layout.addWidget(done)
+        
+        dialog.setLayout(layout)
+        dialog.exec()
+        return str(line_edit.text())
+
+
+
+        
+
+class ImportData(QDialog, Ui_ImportDataDialog):
+    def __init__(self):
+        super().__init__()
+        self.setupUi(self)
+
+        # Instance Variables
+        self.source_directory_path = None
+        self.dest_directory_path = None
+        self.an_info_name = None
+        self.delimiter = ','  # Force the delimiter to be a comma by default
+        self.cohorts = []
+
+        # Column Select Tables
+        self.anInfoTable = None
+        self.anDataTable = None
+
+        # Column Names
+        self.anInfoColumnNames = []
+        self.anDataColumnNames = []
+
+        # Next button functionality
+        self.nextButton.clicked.connect(self.nextPage)
+
+        # Set back button to only be enabled when the current page is not the first page
+        self.backButton.setDisabled(True)
+        self.Pages.currentChanged.connect(lambda: self.backButton.setDisabled(self.Pages.currentIndex() == 0))
+        self.backButton.clicked.connect(self.prevPage)
+
+        # Initial Hides
+        self.importDirectoryProgressBar.hide()
+        self.importDirectoryProgressBar.setValue(0)
+        self.importingStatusLabel.hide()
+        self.importResultLabel.hide()
+        self.directoryLabel.hide()
+        self.selectDelimiterGroupBox.hide()
+        
+        # Start with the first page!
+        self.setDatasetAttributes()
+
+    def prevPage(self):
+        """Go back a page."""
+        page = self.Pages.currentIndex() - 1
+        self.Pages.setCurrentIndex(page)
+        self.nextButton.setText("Next" if page < self.Pages.count() - 1 else "Import")
+        self.nextButton.setDisabled(False)
+
+    def nextPage(self):
+        """Go to the next page."""
+        page = self.Pages.currentIndex()
+        if page == 0:
+            self.importDirectoryPage()
+        elif page == 1:
+            self.validateDirectoryInfo()
+        elif page == 2:
+            self.validateAnInfo()
+        elif page == 3:
+            self.validateAnimalInfoColumns()
+        elif page == 4:
+            self.validateAnimalFileColumns()
+
+        
+    def setDatasetAttributes(self):
+        """
+        PAGE 0
+        Set the attributes of the dataset.
+        """
+        self.Pages.setCurrentIndex(0)
+        self.nextButton.setDisabled(True)
+        self.datasetNameLineEdit.textChanged.connect(lambda: self.nextButton.setDisabled(self.datasetNameLineEdit.text() == ""))
+        self.chooseDestPathButton.clicked.connect(lambda: self.chooseDirectory(self.destPathLineEdit))
+    
+    def importDirectoryPage(self):
+        """
+        PAGE 1
+        Import data from a directory.
+        """
+        self.Pages.setCurrentIndex(1)
+        self.nextButton.setDisabled(True)
+        self.viewCohortsBox.setDisabled(self.source_directory_path is None)
+        self.importDirectoryButton.setDisabled(self.directoryPathLineEdit.text() == "")
+        self.directoryPathLineEdit.textChanged.connect(lambda: self.importDirectoryButton.setDisabled(self.directoryPathLineEdit.text() == ""))
+        self.importDirectoryButton.clicked.connect(self.importDirectory)
+        self.chooseDirectoryButton.clicked.connect(lambda: self.chooseDirectory(self.directoryPathLineEdit))
+        self.chooseDirectoryButton.mouseDoubleClickEvent = lambda event: None
+        self.nextButton.setDisabled(len(self.cohorts) == 0)
+
+
+    def chooseDirectory(self, line_edit):
+        """
+        HELPER FUNCTION
+        Open a file dialog and select a directory to import data from.
+        """
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        if directory:
+            line_edit.setText(directory)
+
+    def importDirectory(self):
+        """
+        INTERACTIONS FUNCTION
+        Import data from the selected directory.
+        """
+        self.cohorts = []
+        self.animalListWidget.clear()
+        
+        if not os.path.exists(self.directoryPathLineEdit.text()):
+            QMessageBox.critical(self, "Error", "The selected directory does not exist.")
+            return
+        
+        directory = self.directoryPathLineEdit.text()
+        self.source_directory_path = directory
+        
+        # Cap the length at 50 characters
+        self.directoryLabel.setText(f"Directory: {directory if len(directory) <= 50 else '...' + directory[-47:]}")
+        self.directoryLabel.show()
+
+        # self.importDirectoryProgressBar.show()
+        # self.importingStatusLabel.show()
+        self.importingStatusLabel.setText(f"Scanning {os.path.basename(directory)}...")
+
+        self.viewCohortsBox.setDisabled(False)
+
+        self.cohortListWidget.clear()
+        if self.cohortFoldersCheckBox.isChecked():
+            self.cohorts = []
+            for item in ListUtils.naturalSort(os.listdir(directory)):
+                # Add directory paths to the list
+                if os.path.isdir(os.path.join(directory, item)):
+                    self.cohorts.append(os.path.join(directory, item))
+        else:
+            # The list is just the directory name
+            self.cohorts = [directory]
+        
+        # Remove hidden files
+        self.cohorts = [item for item in self.cohorts if not os.path.basename(item).startswith('.')]
+
+        for item in self.cohorts:
+            cohort_path = os.path.join(directory, item) if self.cohortFoldersCheckBox.isChecked() else directory
+            
+            list_item = QListWidgetItem(os.path.basename(item))
+            list_item.setData(Qt.ItemDataRole.UserRole, cohort_path)
+            self.cohortListWidget.addItem(list_item)
+
+        self.cohortListWidget.itemDoubleClicked.connect(self.importAnimals)
+        self.importResultLabel.setText(f"Found {len(self.cohorts)} cohorts.")
+        self.importResultLabel.show()
+
+        self.animalListWidget.itemDoubleClicked.connect(self.previewAnimalFile)
+
+
+
+        # delimiter_chosen = lambda: (self.radio_comma or self.radio_tab or self.radio_space or (self.radio_other and self.otherDelimiterLineEdit.text()))
+        language_filled = lambda: self.numChoicesLineEdit.text() and self.numContingenciesLineEdit.text()
+
+        def updateNextButton():
+            self.nextButton.setDisabled((len(self.cohorts) == 0) or not language_filled())
+            # self.nextButton.setDisabled((len(self.cohorts) == 0) or not delimiter_chosen())
+        
+        self.numChoicesLineEdit.textChanged.connect(updateNextButton)
+        self.numContingenciesLineEdit.textChanged.connect(updateNextButton)
+        updateNextButton()
+        # self.radio_comma.toggled.connect(updateNextButton)
+        # self.radio_tab.toggled.connect(updateNextButton)
+        # self.radio_space.toggled.connect(updateNextButton)
+        # self.radio_other.toggled.connect(updateNextButton)
+        # self.otherDelimiterLineEdit.textChanged.connect(updateNextButton)
+
+    def previewAnimalFile(self):
+        """
+        Preview the selected animal file by printing its contents in a new window.
+        """
+        file = self.animalListWidget.currentItem().data(Qt.ItemDataRole.UserRole)
+        with open(file, 'r') as f:
+            contents = f.read()
+        
+        # Spawn a dialog with a text field to display the contents
+        dialog = QDialog()
+        dialog.setWindowTitle(f"Previewing {os.path.basename(file)}")
+        dialog.resize(300, 400)
+
+        text_edit = QTextEdit()
+        text_edit.setText(contents)
+        text_edit.setReadOnly(True)
+
+        # Make it so that if a line is too long, scroll bars appear
+        text_edit.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        text_edit.setAcceptRichText(False)
+
+        row_label = QLabel(f"Rows: {len(contents.splitlines())}")
+
+        layout = QVBoxLayout()
+        
+        layout.addWidget(text_edit)
+        layout.addWidget(row_label)
+        
+
+        dialog.setLayout(layout)
+
+        dialog.exec()
+
+
+    def importAnimals(self):
+        """
+        HELPER FUNCTION
+        Handle double clicks on the cohort list view.
+        """
+        # For all the files in the cohort, add them to the animal list view
+        path = self.cohortListWidget.currentItem().data(Qt.ItemDataRole.UserRole)
+        self.animalListWidget.clear()
+        for item in ListUtils.naturalSort(os.listdir(path)):
+            animal_path = os.path.join(path, item)
+            if os.path.isfile(animal_path) and not os.path.basename(animal_path).startswith('.'):
+                list_item = QListWidgetItem(item)
+                list_item.setData(Qt.ItemDataRole.UserRole, animal_path)
+                self.animalListWidget.addItem(list_item)
+        self.animalFilesLabel.setText(f"Animal Files ({len(self.animalListWidget)} files)")
+
+    def validateDirectoryInfo(self):
+        """
+        DATA VALIDATION FUNCTION
+        """
+        # Ensure the line edits are integers
+        try:
+            num_choices = int(self.numChoicesLineEdit.text())
+            num_contingencies = int(self.numContingenciesLineEdit.text())
+        except:
+            QMessageBox.critical(self, "Error", "The number of choices and contingencies must be integers.")
+            return
+        
+        if num_choices <= 0 or num_contingencies < 0:
+            QMessageBox.critical(self, "Error", "The number of choices must be greater than 0 and the number of contingencies must be non-negative.")
+            return
+        
+        self.selectAnInfo()
+
+
+    def selectAnInfo(self):
+        """
+        PAGE 2
+        Select the animal info file file.
+        """
+        # Set the delimiter depending on the radio button selected
+        # if self.radio_comma.isChecked():
+        #     self.delimiter = ','
+        # elif self.radio_tab.isChecked():
+        #     self.delimiter = '\t'
+        # elif self.radio_space.isChecked():
+        #     self.delimiter = ' '
+        # elif self.radio_other.isChecked():
+        #     self.delimiter = self.otherDelimiterLineEdit.text()
+
+        self.Pages.setCurrentIndex(2)
+        self.anInfoListWidget.clear()
+        self.nextButton.setDisabled(True)
+        self.anInfoListWidget.itemDoubleClicked.connect(self.validateAnInfo)
+
+        cohort = self.cohorts[0]
+
+        self.sampleCohortLabel.setText(f"Showing cohort: {os.path.basename(cohort)}")
+
+        for item in ListUtils.naturalSort(os.listdir(cohort)):
+            file = os.path.join(cohort, item)
+            if os.path.isfile(file) and not os.path.basename(file).startswith('.'):
+                list_item = QListWidgetItem(item)
+                list_item.setData(Qt.ItemDataRole.UserRole, os.path.basename(file))
+                self.anInfoListWidget.addItem(list_item)
+        self.anInfoListWidget.itemClicked.connect(lambda: self.nextButton.setDisabled(self.anInfoListWidget.currentItem() is None))
+
+    def validateAnInfo(self):
+        """
+        DATA VALIDATION FUNCTION
+        Ensures the following conditions are met:
+            - The selected file is present in all cohorts
+            - Verify that the number of columns is the same for all cohorts
+            - Verify that the number of rows is the same as the number of non-aninfo files
+            - Verify that the file is numerical
+        """
+        self.an_info_name = self.anInfoListWidget.currentItem().data(Qt.ItemDataRole.UserRole)
+        
+        # Verify that the file is present in all cohorts
+        missing_files = []
+        for cohort in self.cohorts:
+            if not os.path.exists(os.path.join(cohort, self.an_info_name)):
+                missing_files.append(os.path.basename(cohort))
+        if missing_files:
+            # Show a warning
+            QMessageBox.warning(self, "Warning", f"The file {self.an_info_name} is missing from the following cohorts:\n{', '.join(missing_files)}")
+
+        target_num_cols = -1
+        for cohort in self.cohorts:
+            try:
+                mat = FileUtils.getMatrix(os.path.join(cohort, self.an_info_name), delimiter=self.delimiter)
+            except:
+                QMessageBox.critical(self, "Error", f"Unable to parse the file {self.an_info_name}.")
+                return
+
+            # Check if the matrix is numerical
+            try:
+                mat = mat.astype(float)
+            except:
+                QMessageBox.critical(self, "Error", f"The file {self.an_info_name} is not numerical.")
+                return
+            
+            # Check if the number of columns is the same for all cohorts
+            if target_num_cols == -1:
+                target_num_cols = mat.shape[1]
+            if mat.shape[1] != target_num_cols:
+                QMessageBox.critical(self, "Error", "The number of columns in the selected file is not the same for all cohorts.")
+                return
+            
+            # Count the number of non-aninfo files
+            num_files = len([name for name in os.listdir(cohort) if os.path.isfile(os.path.join(cohort, name)) and not name.startswith('.') and name != self.an_info_name])
+            if num_files != mat.shape[0]:
+                QMessageBox.critical(self, "Error", f"""The number of rows in the selected file is not the same as the number of non-aninfo files in {os.path.basename(cohort)}.
+                                     \nExpected {num_files}, got {mat.shape[0]}.""")
+                return
+        
+        # If the above code runs without any issues, we can proceed to the next step
+        self.labelAnimalInfoColumns()
+
+    def clearContainer(self, container: QVBoxLayout):
+        """
+        HELPER FUNCTION
+        Clear a container of widgets.
+        """
+        for i in range(container.count()):
+            widget = container.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+            
+    def labelAnimalInfoColumns(self):
+        """
+        PAGE 3
+        Label the columns of the animal info file.
+        """
+        self.Pages.setCurrentIndex(3)
+
+        # Get the first animal info file of the first cohort as a sample
+        cohort = self.cohorts[0]
+        an_info_file = os.path.join(cohort, self.an_info_name)
+
+        self.clearContainer(self.anInfoTableWidgetContainer)
+        self.anInfoTable = ColumnSelectTable(an_info_file, self.delimiter, mode='info')
+        self.anInfoTableWidgetContainer.addWidget(self.anInfoTable)
+        self.sampleAnimalLabel_info.setText(f"Showing sample animal info file: {os.path.basename(cohort)}/{self.an_info_name}")
+
+    def validateAnimalInfoColumns(self):
+        """
+        DATA VALIDATION FUNCTION
+        """
+        # Check if the columns have been labeled
+        table_vals = self.anInfoTable.columns.values()
+        if None in table_vals:
+            QMessageBox.warning(self, "Warning", "Not all columns have been labeled. If not labeled, the column will be referred to by its index.")
+
+        if "Covariate" in table_vals:
+            QMessageBox.information(self, "Covariate Selected", "A covariate column has been identified. This means this dataset can use the Correlational CBAS.")
+
+
+        # Append the column names to the list. Use the index if the column is not labeled
+        for  i, label in self.anInfoTable.columns.items():
+            if label is None:
+                self.anInfoColumnNames.append(str(i))
+            else:
+                self.anInfoColumnNames.append(label)
+        
+        # If all the above checks pass, we can proceed to the next step
+        self.labelAnimalFileColumns()
+    
+    def labelAnimalFileColumns(self):
+        """
+        PAGE 4
+        Label the columns of the animal file.
+        """
+        self.Pages.setCurrentIndex(4)
+
+        # Get the first animal file of the first cohort as a sample
+        cohort = self.cohorts[0]
+        animal_file = os.path.join(cohort, [name for name in os.listdir(cohort) if os.path.isfile(os.path.join(cohort, name)) and not name.startswith('.') and name != self.an_info_name][0])
+
+        self.clearContainer(self.anDataTableWidgetContainer)
+        self.anDataTable = ColumnSelectTable(animal_file, self.delimiter, mode='data')
+        self.anDataTableWidgetContainer.addWidget(self.anDataTable)
+
+        self.sampleAnimalLabel_data.setText(f"Showing sample animal file: {os.path.basename(cohort)}/{os.path.basename(animal_file)}")
+
+    def validateAnimalFileColumns(self):
+        """
+        DATA VALIDATION FUNCTION
+        """
+        # Check if the columns have been labeled
+        table_vals = self.anDataTable.columns.values()
+        if "Choice" not in table_vals:
+            QMessageBox.critical(self, "Error", "The 'Choice' column is missing and is required.")
+            return
+        if "Session" not in table_vals or "Contingency" not in table_vals or "Modifier" not in table_vals:
+            QMessageBox.warning(self, "Warning", "No 'Session', 'Contingency', or 'Modifier' columns specified. These columns are optional. If not included, 'Session' and 'Contingency' will be considered 0 for all subjects.")
+        
+        self.showSummary()
+
+    def showSummary(self):
+        """
+        PAGE 5
+        Show a summary of the data to be imported.
+        """
+        self.Pages.setCurrentIndex(5)
+        self.nextButton.setText("Import")
+        self.clearContainer(self.basicInfoContainer)
+        self.basicInfoContainer.addWidget(self.basicInfoGroupBox)
+        
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = ImportData()
+    window.show()
+    sys.exit(app.exec())

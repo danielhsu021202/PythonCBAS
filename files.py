@@ -78,6 +78,9 @@ class CBASFile:
         'ALLSEQ': 2,
         'ALLSEQALLAN': 3,
         'SEQCNTS': 4,
+        'SEQRATES': 5,
+        'RESAMPLED': 6,
+        'SIGSEQS': 7,
     }
 
     compression_formats = {

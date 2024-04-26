@@ -54,10 +54,9 @@ class StringUtils:
 
 class FileUtils:
 
-    def getMatrix(file, delimiter=',', dtype=int):
+    def getMatrix(file, delimiter=',', dtype=int, limit_rows=None) -> np.ndarray:
         """Takes a text file and returns a numpy matrix"""
-        # Force it to be 2D even if there's only one row
-        return np.atleast_2d(np.genfromtxt(file, delimiter=delimiter, dtype=dtype))
+        return np.atleast_2d(np.genfromtxt(file, delimiter=delimiter, dtype=dtype, max_rows=limit_rows)) # Force it to be 2D even if there's only one row
     
     def writeMatrix(file, mat, filetype='txt', delimiter=',', fmt='%d'):
         """Writes a numpy matrix to a text file. Don't write an extra line"""
@@ -144,3 +143,4 @@ class ListUtils:
     def countAllSorted(l):
         """Returns a dictionary of the number of occurrences of each unique element in a list, sorted by the element."""
         return {k: v for k, v in sorted(ListUtils.countAll(l).items())}
+    

@@ -20,6 +20,7 @@ import qdarktheme
 from ui.MainWindow import Ui_MainWindow
 
 from FileViewer import FileViewer
+from ImportData import ImportData
 
 from utils import FileUtils
 from files import CBASFile
@@ -173,17 +174,20 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.mainStack.setCurrentIndex(1)
 
 
-    
+    def importData(self):
+        self.importDataDialog = ImportData()
+        self.importDataDialog.exec()
 
     def setUpMenuBar(self):
         self.menubar = self.menuBar()
-        self.menubar.setNativeMenuBar(False)  # For macOS
+        # self.menubar.setNativeMenuBar(False)  # For macOS
         self.actionGet_Sequences.triggered.connect(self.runCBAS)
         self.actionDarkTheme.triggered.connect(lambda: qdarktheme.setup_theme("dark", additional_qss=qss))
         self.actionLightTheme.triggered.connect(lambda: qdarktheme.setup_theme("light"))
         self.actionAutoTheme.triggered.connect(lambda: qdarktheme.setup_theme("auto", additional_qss=qss))
         self.actionImport_Data.triggered.connect(lambda: self.mainStack.setCurrentIndex(0))
         self.actionFile_Viewer.triggered.connect(lambda: self.mainStack.setCurrentIndex(1))
+        self.actionImport_Data_Dialog.triggered.connect(self.importData)
 
     def runCBAS(self):
         startCBASTerminal()

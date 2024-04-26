@@ -51,7 +51,7 @@
      <x>0</x>
      <y>0</y>
      <width>853</width>
-     <height>22</height>
+     <height>37</height>
     </rect>
    </property>
    <widget class="QMenu" name="temporary_menu">
@@ -94,6 +94,13 @@
     <addaction name="separator"/>
     <addaction name="menuAppearance"/>
    </widget>
+   <widget class="QMenu" name="menuImport">
+    <property name="title">
+     <string>Import</string>
+    </property>
+    <addaction name="actionImport_Data_Dialog"/>
+   </widget>
+   <addaction name="menuImport"/>
    <addaction name="temporary_menu"/>
    <addaction name="menuPage"/>
    <addaction name="menuPreferences"/>
@@ -176,6 +183,11 @@
   <action name="actionFont_Size">
    <property name="text">
     <string>Font Size</string>
+   </property>
+  </action>
+  <action name="actionImport_Data_Dialog">
+   <property name="text">
+    <string>Import Data</string>
    </property>
   </action>
  </widget>

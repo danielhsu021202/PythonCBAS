@@ -81,7 +81,7 @@ class PandasTableModel(QAbstractTableModel):
 
 
 class PandasTable(QTableView):
-    def __init__(self, data, parent=None):
+    def __init__(self, data, parent=None, view_only=False):
         super().__init__()
         self.df: pd.DataFrame = data
         self.parent = parent
@@ -90,21 +90,22 @@ class PandasTable(QTableView):
 
         self.setAlternatingRowColors(True)
 
-        self.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.horizontalHeader().customContextMenuRequested.connect(self.onHeaderContextMenuRequested)
-        self.verticalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.verticalHeader().customContextMenuRequested.connect(self.onHeaderContextMenuRequested)
+        if not view_only:
+            self.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.horizontalHeader().customContextMenuRequested.connect(self.onHeaderContextMenuRequested)
+            self.verticalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.verticalHeader().customContextMenuRequested.connect(self.onHeaderContextMenuRequested)
 
     def onHeaderContextMenuRequested(self, pos):
         menu = QMenu()
         sortAscendingAction = menu.addAction("Sort Ascending",)
         sortDescendingAction = menu.addAction("Sort Descending")
-        
-        sumAction = menu.addAction("Sum")
-        averageAction = menu.addAction("Average")
-        medianAction = menu.addAction("Median")
-        modeAction = menu.addAction("Mode")
-        rangeAction = menu.addAction("Range")
+        stats_menu = menu.addMenu("Statistics")
+        sumAction = stats_menu.addAction("Sum")
+        averageAction = stats_menu.addAction("Average")
+        medianAction = stats_menu.addAction("Median")
+        modeAction = stats_menu.addAction("Mode")
+        rangeAction = stats_menu.addAction("Range")
         filterAction = ""
         if self.sender() == self.horizontalHeader():
             filterAction = menu.addAction("Filter")
