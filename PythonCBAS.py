@@ -10,17 +10,23 @@ import time
 import numpy as np
 import re
 import argparse
+import datetime
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QTreeWidgetItemIterator
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QFileDialog, QMessageBox, QDialog
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt
 
 import qdarktheme
 
 from ui.MainWindow import Ui_MainWindow
+from ui.Lobby import Ui_Lobby
 
 from FileViewer import FileViewer
 from ImportData import ImportData
+from Card import Card
+from settings import Project
+
+
 
 from utils import FileUtils
 from files import CBASFile
@@ -152,12 +158,72 @@ def startCBASTerminal(num_samples):
     sys.exit()
 
 
-class PythonCBAS(QMainWindow, Ui_MainWindow):
+class Lobby(QDialog, Ui_Lobby):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("PythonCBAS")
+
+        self.mainStack.setCurrentIndex(0)
+        self.newProjectButton.clicked.connect(lambda: self.mainStack.setCurrentIndex(1))
+        self.cancelButton.clicked.connect(self.reset)
+        self.createProjectButton.clicked.connect(self.createProject)
+        self.projectLocationButton.clicked.connect(self.getDirectory)
+        self.openProjectButton.clicked.connect(self.getProject)
+
+        self.returnValue = None
+
+    def run(self):
+        self.exec()
+        return self.returnValue
+    
+    def getDirectory(self):
+        dir = QFileDialog.getExistingDirectory(self, "Select Directory")
+        self.projectLocationField.setText(dir)
+
+    def getProject(self):
+        """Open a file dialog to get .json or .cbasproj file"""
+        filepath, _ = QFileDialog.getOpenFileName(self, "Open Project", filter="PythonCBAS Project (*.json *.cbasproj)")
+        if filepath:
+            self.loadProject(filepath)
+
+    def reset(self):
+        self.mainStack.setCurrentIndex(0)
+        self.projectNameField.clear()
+        self.projectLocationField.clear()
+        self.descriptionTextEdit.clear()
+
+    def createProject(self):
+        filepath = os.path.join(self.projectLocationField.text(), self.projectNameField.text() + ".json")
+        if os.path.exists(filepath):
+            QMessageBox.warning(self, "Project Exists", "A project with that name already exists in the specified location.")
+            return
+        project = Project()
+        datecreated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        project.createProject(self.projectNameField.text(), self.descriptionTextEdit.toPlainText(), 
+                              datecreated, self.projectLocationField.text(), "beta")
+        project.writeProject()
+        self.returnValue = project
+        self.close()
+
+    def loadProject(self, filepath):
+        project = Project()
+        project.readProject(filepath)
+        self.returnValue = project
+        self.close()
         
+                              
+
+
+class PythonCBAS(QMainWindow, Ui_MainWindow):
+    def __init__(self, project: Project):
+        super().__init__()
+        self.setupUi(self)
+        
+        
+        self.project = project
+
+        self.setWindowTitle(project.getProjectName())
 
         self.setUpMenuBar()
 
@@ -178,6 +244,17 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.importDataDialog = ImportData()
         self.importDataDialog.exec()
 
+    def showExampleCard(self):
+        dialog = QDialog()
+        card = Card(dialog)
+
+        layout = QVBoxLayout()
+        layout.addWidget(card)
+
+        dialog.setLayout(layout)
+
+        dialog.exec()
+
     def setUpMenuBar(self):
         self.menubar = self.menuBar()
         # self.menubar.setNativeMenuBar(False)  # For macOS
@@ -188,6 +265,7 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.actionImport_Data.triggered.connect(lambda: self.mainStack.setCurrentIndex(0))
         self.actionFile_Viewer.triggered.connect(lambda: self.mainStack.setCurrentIndex(1))
         self.actionImport_Data_Dialog.triggered.connect(self.importData)
+        self.actionCard.triggered.connect(self.showExampleCard)
 
     def runCBAS(self):
         startCBASTerminal()
@@ -206,6 +284,9 @@ if __name__ == "__main__":
     else:
         app = QApplication(sys.argv)
 
+        # Load App Configurations
+
+
         # Load ui/styles.qss
         with open("ui/styles.qss", "r") as f:
             qss = f.read()
@@ -217,6 +298,12 @@ if __name__ == "__main__":
 
         
         
-        window = PythonCBAS()
-        window.show()
+        lobby = Lobby()
+        project = lobby.run()
+        if project is not None:
+            mainWindow = PythonCBAS(project)
+            mainWindow.show()
+        else:
+            sys.exit()
+
         sys.exit(app.exec())

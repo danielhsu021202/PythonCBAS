@@ -1,6 +1,9 @@
 import numpy as np
 import re
+import os
+import uuid
 import pickle
+import json
 import gzip
 from scipy.sparse import csr_matrix
 
@@ -9,14 +12,8 @@ class HexUtils:
     def numHexDigits(num: int):
         return len(hex(num)) - 2
     
-    def getSeqNumHexNum(num: int, cont, length, LANGUAGE):
-        """Constructs the hex string for the sequence number given the number of digits needed to encode the number of contingencies and the maximum sequence length.
-        Returns the integer represented by the hex string."""
-        nex_num = hex(num)[2:]
-        # The hex string for contingency and length, padded with zeros to the appropriate number of digits
-        hex_cont = hex(cont)[2:].zfill(HexUtils.numHexDigits(LANGUAGE['NUM_CONTINGENCIES']))
-        hex_length = hex(length)[2:].zfill(HexUtils.numHexDigits(LANGUAGE['MAX_SEQUENCE_LENGTH']))
-        return int(hex_cont + hex_length + nex_num, 16)
+    def genUUID():
+        return uuid.uuid4().hex
     
 
 class StringUtils:
@@ -62,6 +59,14 @@ class FileUtils:
         """Writes a numpy matrix to a text file. Don't write an extra line"""
         np.savetxt(file, mat, delimiter=delimiter, fmt=fmt)
 
+    def getMatrixNpy(file):
+        """Loads a numpy matrix from a .npy file."""
+        return np.load(file)
+    
+    def writeMatrixNpy(file, mat):
+        """Writes a numpy matrix to a .npy file."""
+        np.save(file, mat)
+
     def isCompressed(filepath):
         """Returns True if the file is compressed, False otherwise"""
         try:
@@ -87,6 +92,14 @@ class FileUtils:
         else:
             with open(filepath, 'rb') as f:
                 return pickle.load(f)
+    
+    def writeJSON(filepath, obj):
+        """Write a JSON object to a file."""
+        json.dump(obj, filepath)
+
+    def readJSON(filepath):
+        """Read a JSON object from a file."""
+        return json.load(filepath)
 
             
 class MatrixUtils:

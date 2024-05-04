@@ -60,6 +60,7 @@
     </property>
     <addaction name="actionGet_Sequences"/>
     <addaction name="actionGenerate_Groups"/>
+    <addaction name="actionCard"/>
    </widget>
    <widget class="QMenu" name="menuPage">
     <property name="title">
@@ -188,6 +189,11 @@
   <action name="actionImport_Data_Dialog">
    <property name="text">
     <string>Import Data</string>
+   </property>
+  </action>
+  <action name="actionCard">
+   <property name="text">
+    <string>Card</string>
    </property>
   </action>
  </widget>
