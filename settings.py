@@ -156,7 +156,7 @@ class Project:
         for dataset in datasets:
             dataset_obj = DataSet()
             dataset_obj.readDataset(dataset)
-            datasetid = dataset_obj.getDatasetID()
+            # datasetid = dataset_obj.getDatasetID()
             self.datasets[datasetid] = dataset_obj
 
     def exportProject(self):
@@ -178,7 +178,7 @@ class Project:
         self.projectid = str(uuid.uuid4())
         self.project_attr = {
             "type": "project",
-            "projectid": self.projectid,
+            # "projectid": self.projectid,
             "name": name,
             "description": description,
             "datecreated": datecreated,
@@ -188,7 +188,8 @@ class Project:
         }
 
     def addDataset(self, datasetid, dataset_obj):
-        dataset_obj.setProjectID(self.projectid)
+        # dataset_obj.setProjectID(self.projectid)
+        dataset_obj.setParent(self)
         self.datasets[datasetid] = dataset_obj
 
     
@@ -196,12 +197,13 @@ class Project:
     def getType(self) -> str: "project"
     def getProjectAttr(self) -> dict: return self.project_attr
     def getProjectID(self) -> str: return self.projectid
-    def getProjectName(self) -> str: return self.project_attr["name"]
+    def getName(self) -> str: return self.project_attr["name"]
     def getProjectDir(self) -> str: return self.project_attr["dir"]
     def getProjectVersion(self) -> str: return self.project_attr["version"]
     def getProjectDateCreated(self) -> str: return self.project_attr["datecreated"]
     def getProjectDateModified(self) -> str: return self.project_attr["datemodified"]
     def getChildren(self) -> dict: return self.datasets
+    def getParent(self) -> None: return None
 
     ### SETTER FUNCTIONS ###
     def setDateModified(self, date): self.project_attr["datemodified"] = date
@@ -209,16 +211,17 @@ class Project:
 
 class DataSet:
     def __init__(self):
-        self.datasetid = None
-        self.projectid = None
+        # self.datasetid = None
+        # self.projectid = None
+        self.parent = None
         self.counts = {}
         self.dataset_settings = None
 
     def readDataset(self, dataset: dict):
         try:
             assert dataset["type"] == "dataset"
-            self.datasetid = dataset["datasetid"]
-            self.projectid = dataset["projectid"]
+            # self.datasetid = dataset["datasetid"]
+            # self.projectid = dataset["projectid"]
             counts = dataset["counts"]
         except KeyError:
             raise KeyError("Error reading in the datasets.")
@@ -235,8 +238,8 @@ class DataSet:
         """Generate the dictionary for a dataset object."""
         dataset = {
             "type": "dataset",
-            "datasetid": self.getDatasetID(),
-            "projectid": self.getProjectID(),
+            # "datasetid": self.getDatasetID(),
+            # "projectid": self.getProjectID(),
             "dataset_settings": self.getSettings(),
             "counts": [count.exportCounts() for count in self.counts.values()]
         }
@@ -263,8 +266,8 @@ class DataSet:
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "dataset"
-    def getProjectID(self): return self.projectid
-    def getDatasetID(self): return self.datasetid
+    # def getProjectID(self): return self.projectid
+    # def getDatasetID(self): return self.datasetid
     def getCardInfo(self) -> tuple: return (self.getName(), StringUtils.lastNChars(self.getDir(), 40))
     def getSettings(self) -> dict: return self.dataset_settings
     def getName(self) -> str: return self.dataset_settings["name"]
@@ -280,7 +283,8 @@ class DataSet:
     def getChildren(self) -> dict: return self.counts
 
     ### SETTER FUNCTIONS ###
-    def setProjectID(self, projectid): self.projectid = projectid
+    # def setProjectID(self, projectid): self.projectid = projectid
+    def setParent(self, parent): self.parent = parent
     
         
 
