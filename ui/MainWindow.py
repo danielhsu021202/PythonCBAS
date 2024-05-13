@@ -30,11 +30,11 @@ class Ui_MainWindow(object):
         self.verticalLayout = QtWidgets.QVBoxLayout(self.FileViewerPage)
         self.verticalLayout.setObjectName("verticalLayout")
         self.mainStack.addWidget(self.FileViewerPage)
-        self.CBASSettingsPage = QtWidgets.QWidget()
-        self.CBASSettingsPage.setObjectName("CBASSettingsPage")
-        self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.CBASSettingsPage)
+        self.NavigatorPage = QtWidgets.QWidget()
+        self.NavigatorPage.setObjectName("NavigatorPage")
+        self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.NavigatorPage)
         self.verticalLayout_3.setObjectName("verticalLayout_3")
-        self.mainStack.addWidget(self.CBASSettingsPage)
+        self.mainStack.addWidget(self.NavigatorPage)
         self.gridLayout.addWidget(self.mainStack, 0, 0, 1, 1)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(parent=MainWindow)
@@ -114,7 +114,7 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menuPreferences.menuAction())
 
         self.retranslateUi(MainWindow)
-        self.mainStack.setCurrentIndex(0)
+        self.mainStack.setCurrentIndex(2)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):

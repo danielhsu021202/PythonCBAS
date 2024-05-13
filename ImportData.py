@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QVBoxLayout, QTextEdit, QListWidgetItem, QFileDialog, QTableWidget, QLabel, QTableWidgetItem, QMessageBox, QDialog, QMenu, QPushButton, QLineEdit
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QTextEdit, QListWidgetItem, QFileDialog, QTableWidget, QLabel, QTableWidgetItem, QMessageBox, QDialog, QMenu, QPushButton, QLineEdit, QLabel
 from PyQt6.QtGui import QIcon, QCursor
 from PyQt6.QtCore import Qt
 
@@ -6,6 +6,7 @@ import os
 import sys
 
 from utils import ListUtils, FileUtils
+from settings import DataSet
 
 from ui.ImportDataDialog import Ui_ImportDataDialog
 
@@ -170,9 +171,17 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         self.importResultLabel.hide()
         self.directoryLabel.hide()
         self.selectDelimiterGroupBox.hide()
+        self.destLocationGroupBox.hide()
         
         # Start with the first page!
         self.setDatasetAttributes()
+
+        self.returnValue = None
+
+    def run(self):
+        self.exec()
+        self.close()
+        return self.returnValue
 
     def prevPage(self):
         """Go back a page."""
@@ -509,6 +518,7 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         Label the columns of the animal file.
         """
         self.Pages.setCurrentIndex(4)
+        self.nextButton.setText("Import")
 
         # Get the first animal file of the first cohort as a sample
         cohort = self.cohorts[0]
@@ -532,17 +542,34 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         if "Session" not in table_vals or "Contingency" not in table_vals or "Modifier" not in table_vals:
             QMessageBox.warning(self, "Warning", "No 'Session', 'Contingency', or 'Modifier' columns specified. These columns are optional. If not included, 'Session' and 'Contingency' will be considered 0 for all subjects.")
         
-        self.showSummary()
+        dataset = DataSet()
+        dataset.createDataset(self.datasetNameLineEdit.text(),
+                              self.source_directory_path,
+                              self.an_info_name,
+                              self.anInfoColumnNames,
+                              self.anDataColumnNames,
+                              "Covariate" in self.anInfoColumnNames,
+                              int(self.numChoicesLineEdit.text()),
+                              1,
+                              int(self.numContingenciesLineEdit.text())
+        )
+        self.returnValue = dataset
 
-    def showSummary(self):
-        """
-        PAGE 5
-        Show a summary of the data to be imported.
-        """
-        self.Pages.setCurrentIndex(5)
-        self.nextButton.setText("Import")
-        self.clearContainer(self.basicInfoContainer)
-        self.basicInfoContainer.addWidget(self.basicInfoGroupBox)
+    #     self.showSummary()
+
+    # def showSummary(self):
+    #     """
+    #     PAGE 5
+    #     Show a summary of the data to be imported.
+    #     """
+    #     self.Pages.setCurrentIndex(5)
+    #     self.nextButton.setText("Import")
+    #     self.clearContainer(self.basicInfoContainer)
+    #     self.basicInfoContainer.addWidget(self.basicInfoGroupBox)
+    #     self.basicInfoContainer.addWidget(QLabel("Importing from:"))
+    #     self.basicInfoContainer.addWidget(QLabel(f"Source Directory: {self.source_directory_path}"))
+    #     self.basicInfoContainer.addWidget(self.languageGroupBox)
+    #     self.basicInfoContainer.addWidget(QLabel(f"Animal Info File Name: {self.an_info_name}"))
         
 
 

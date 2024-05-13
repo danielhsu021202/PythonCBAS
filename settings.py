@@ -1,7 +1,27 @@
 import os
-from utils import FileUtils
+from utils import FileUtils, StringUtils
 import uuid
 import json
+import datetime
+
+next_type = {
+    "project": "dataset",
+    "dataset": "counts",
+    "counts": "resample",
+    "resample": "pvalues",
+    "pvalues": "visualizations",
+    "visualizations": None
+}
+
+prev_type = {
+    "project": None,
+    "dataset": "project",
+    "counts": "dataset",
+    "resample": "counts",
+    "pvalues": "resample",
+    "visualizations": "pvalues"
+}
+
 
 class Settings:
     def __init__(self):
@@ -150,6 +170,7 @@ class Project:
     def writeProject(self):
         filename = self.getProjectName() + ".json" #TODO: Change this to .cbasproj extension
         filepath = os.path.join(self.getProjectDir(), filename)
+        self.setDateModified(str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         with open(filepath, 'w') as f:
             json.dump(self.exportProject(), f)
 
@@ -172,6 +193,7 @@ class Project:
 
     
     ### GETTER FUNCTIONS ###
+    def getType(self) -> str: "project"
     def getProjectAttr(self) -> dict: return self.project_attr
     def getProjectID(self) -> str: return self.projectid
     def getProjectName(self) -> str: return self.project_attr["name"]
@@ -179,6 +201,10 @@ class Project:
     def getProjectVersion(self) -> str: return self.project_attr["version"]
     def getProjectDateCreated(self) -> str: return self.project_attr["datecreated"]
     def getProjectDateModified(self) -> str: return self.project_attr["datemodified"]
+    def getChildren(self) -> dict: return self.datasets
+
+    ### SETTER FUNCTIONS ###
+    def setDateModified(self, date): self.project_attr["datemodified"] = date
             
 
 class DataSet:
@@ -216,7 +242,7 @@ class DataSet:
         }
         return dataset
     
-    def createDataset(self, name, dir, aninfoname, anInfoColumnNames, anDataColumnNames, correlational_possible, language):
+    def createDataset(self, name, dir, aninfoname, anInfoColumnNames, anDataColumnNames, correlational_possible, num_choices, num_modifiers, num_contingencies):
         self.datasetid = str(uuid.uuid4())
         self.dataset_settings = {
             "name": name,
@@ -225,20 +251,21 @@ class DataSet:
             "anInfoColumnNames": anInfoColumnNames,
             "anDataColumnNames": anDataColumnNames,
             "correlational_possible": correlational_possible,
-            "language": language
+            "language": {
+                "num_choices": num_choices,
+                "num_modifiers": num_modifiers,
+                "num_contingencies": num_contingencies
+            }
         }
-        
-
-    def getProjectID(self):
-        return self.projectid
-
-    def getDatasetID(self):
-        return self.datasetid
     
     def addCountsObj(self, countsid, counts_obj):
         self.counts[countsid] = counts_obj
 
     ### GETTER FUNCTIONS ###
+    def getType(self) -> str: return "dataset"
+    def getProjectID(self): return self.projectid
+    def getDatasetID(self): return self.datasetid
+    def getCardInfo(self) -> tuple: return (self.getName(), StringUtils.lastNChars(self.getDir(), 40))
     def getSettings(self) -> dict: return self.dataset_settings
     def getName(self) -> str: return self.dataset_settings["name"]
     def getDir(self) -> str: return self.dataset_settings["dir"]
@@ -250,6 +277,7 @@ class DataSet:
     def getNumChoices(self) -> int: return self.getLanguage()["num_choices"]
     def getNumModifiers(self) -> int: return self.getLanguage()["num_modifiers"]
     def getNumContingencies(self) -> int: return self.getLanguage()["num_contingencies"]
+    def getChildren(self) -> dict: return self.counts
 
     ### SETTER FUNCTIONS ###
     def setProjectID(self, projectid): self.projectid = projectid
@@ -295,23 +323,38 @@ class Counts:
         }
         return counts
 
-    def getCountsID(self): return self.countsid
-    
-    def getDatasetID(self): return self.datasetid
+    def createCounts(self, name: str, order, number: int, include_failed: bool, allow_redemption: bool, max_seq_len: int, straddle_sessions: bool):
+        self.countsid = str(uuid.uuid4())
+        self.counts_settings = {
+            "name": name,
+            "criterion": {
+                "order": order,
+                "number": number,
+                "include_failed": include_failed,
+                "allow_redemption": allow_redemption
+            },
+            "max_seq_len": max_seq_len,
+            "straddle_sessions": straddle_sessions
+        }
     
     def addResamplesObj(self, resampleid, resample_obj):
         self.resamples[resampleid] = resample_obj
 
     ### GETTER FUNCTIONS ###
+    def getType(self) -> str: return "counts"
+    def getCountsID(self): return self.countsid
+    def getDatasetID(self): return self.datasetid
+    def getCardInfo(self): return (self.getName(), "")
     def getCountsSettings(self) -> dict: return self.counts_settings
+    def getName(self) -> str: return self.counts_settings["name"]
     def getCriterion(self) -> dict: return self.counts_settings["criterion"]
     def getOrder(self) -> list: return self.getCriterion()["order"]
     def getNumber(self) -> int: return self.getCriterion()["number"]
     def includeFailed(self) -> bool: return self.getCriterion()["include_failed"]
     def allowRedemption(self) -> bool: return self.getCriterion()["allow_redemption"]
     def getMaxSequenceLength(self) -> int: return self.counts_settings["max_seq_len"]
-    def getOutputDir(self) -> str: return self.counts_settings["outputdir"]
     def straddleSessions(self) -> bool: return self.counts_settings["straddle_sessions"]
+    def getChildren(self) -> dict: return self.resamples
 
 
 
@@ -349,20 +392,31 @@ class Resamples:
         }
         return resamples
     
-    def getResampleID(self): return self.resampleid
-
-    def getCountsID(self): return self.countsid
+    def createResample(self, name: str, seed, num_resamples: int, contingencies: list, groups: dict):
+        self.resampleid = str(uuid.uuid4())
+        self.resample_settings = {
+            "name": name,
+            "seed": seed,
+            "numresamples": num_resamples,
+            "contingencies": contingencies,
+            "groups": groups
+        }
     
     def addPvaluesObj(self, pvalueid, pvalue_obj):
         self.pvalues[pvalueid] = pvalue_obj
 
     ### GETTER FUNCTIONS ###
+    def getType(self) -> str: return "resample"
+    def getResampleID(self): return self.resampleid
+    def getCountsID(self): return self.countsid
+    def getCardInfo(self): return (self.getName(), "")
     def getResampleSettings(self) -> dict: return self.resample_settings
+    def getName(self) -> str: return self.resample_settings["name"]
     def getSeed(self) -> int: return self.resample_settings["seed"]
     def getNumResamples(self) -> int: return self.resample_settings["numresamples"]
     def getContingencies(self) -> list: return self.resample_settings["contingencies"]
     def getGroups(self) -> dict: return self.resample_settings["groups"]
-    
+    def getChildren(self) -> dict: return self.pvalues
     
 
 
@@ -405,6 +459,7 @@ class Pvalues:
         return self.resampleid
     
     ### GETTER FUNCTIONS ###
+    def getType(self) -> str: return "pvalues"
     def getPvaluesSettings(self) -> dict: return self.pvaluesettings
     def useFDP(self) -> bool: return self.pvaluesettings["fdp"]
     def getAlpha(self) -> float: return self.pvaluesettings["alpha"]

@@ -22,6 +22,7 @@ from ui.MainWindow import Ui_MainWindow
 from ui.Lobby import Ui_Lobby
 
 from FileViewer import FileViewer
+from Navigator import Navigator
 from ImportData import ImportData
 from Card import Card
 from settings import Project
@@ -174,10 +175,12 @@ class Lobby(QDialog, Ui_Lobby):
         self.returnValue = None
 
     def run(self):
+        """Run the dialog and return the project object."""
         self.exec()
         return self.returnValue
     
     def getDirectory(self):
+        """Open a file dialog to get a directory"""
         dir = QFileDialog.getExistingDirectory(self, "Select Directory")
         self.projectLocationField.setText(dir)
 
@@ -188,12 +191,14 @@ class Lobby(QDialog, Ui_Lobby):
             self.loadProject(filepath)
 
     def reset(self):
+        """Reset the create project dialog to its initial state."""
         self.mainStack.setCurrentIndex(0)
         self.projectNameField.clear()
         self.projectLocationField.clear()
         self.descriptionTextEdit.clear()
 
     def createProject(self):
+        """Process the information in the create project dialog and create a project object."""
         filepath = os.path.join(self.projectLocationField.text(), self.projectNameField.text() + ".json")
         if os.path.exists(filepath):
             QMessageBox.warning(self, "Project Exists", "A project with that name already exists in the specified location.")
@@ -207,6 +212,7 @@ class Lobby(QDialog, Ui_Lobby):
         self.close()
 
     def loadProject(self, filepath):
+        """Load a project from a .json or .cbasproj file."""
         project = Project()
         project.readProject(filepath)
         self.returnValue = project
@@ -229,15 +235,18 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
 
 
 
-        # Add the File Viewer Frame to the main staci
-        self.fileViewer = FileViewer()
-        self.FileViewerPage.layout().addWidget(self.fileViewer)
+        # # Add the File Viewer Frame to the main staci
+        # self.fileViewer = FileViewer()
+        # self.FileViewerPage.layout().addWidget(self.fileViewer)
+
+        self.navigator = Navigator(project_obj=self.project)
+        self.NavigatorPage.layout().addWidget(self.navigator)
 
         # Set size
-        self.resize(1920, 1080)
+        self.resize(960, 720)
         # self.showFullScreen()
         
-        self.mainStack.setCurrentIndex(1)
+        self.mainStack.setCurrentIndex(2)
 
 
     def importData(self):

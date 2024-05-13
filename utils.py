@@ -47,6 +47,14 @@ class StringUtils:
         """Returns a string with the elements of the string separated by 'and'."""
         return StringUtils.andSeparateList([s.strip() for s in string.split(",")], include_verb)
     
+    def capitalizeFirstLetter(s: str) -> str:
+        """Capitalizes the first letter of a string."""
+        return s[0].upper() + s[1:]
+    
+    def lastNChars(s: str, n: int) -> str:
+        """Returns the last n characters of a string. Precede with elipsis if n is less than the length of the string."""
+        return s if len(s) <= n else "..." + s[-(n - 3):]
+    
     
 
 class FileUtils:

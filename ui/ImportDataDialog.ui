@@ -60,7 +60,7 @@
    <item row="0" column="1">
     <widget class="QStackedWidget" name="Pages">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="DatasetAttributesPage">
       <layout class="QVBoxLayout" name="verticalLayout_12">
@@ -95,7 +95,7 @@
           <item>
            <widget class="QLabel" name="label_13">
             <property name="text">
-             <string>Description</string>
+             <string>Description (optional)</string>
             </property>
            </widget>
           </item>
@@ -106,7 +106,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="groupBox">
+        <widget class="QGroupBox" name="destLocationGroupBox">
          <property name="title">
           <string>Location</string>
          </property>
@@ -214,7 +214,7 @@
                </widget>
               </item>
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout">
+               <layout class="QHBoxLayout" name="sourceDirContainer">
                 <item>
                  <widget class="QLineEdit" name="directoryPathLineEdit">
                   <property name="minimumSize">
@@ -423,7 +423,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="groupBox_3">
+        <widget class="QGroupBox" name="languageGroupBox">
          <property name="title">
           <string>Language</string>
          </property>
@@ -669,51 +669,6 @@
         </widget>
        </item>
       </layout>
-     </widget>
-     <widget class="QWidget" name="SummaryPage">
-      <widget class="QLabel" name="label_11">
-       <property name="geometry">
-        <rect>
-         <x>12</x>
-         <y>12</y>
-         <width>73</width>
-         <height>19</height>
-        </rect>
-       </property>
-       <property name="font">
-        <font>
-         <pointsize>16</pointsize>
-         <bold>true</bold>
-        </font>
-       </property>
-       <property name="text">
-        <string>Summary</string>
-       </property>
-      </widget>
-      <widget class="QWidget" name="verticalLayoutWidget_3">
-       <property name="geometry">
-        <rect>
-         <x>40</x>
-         <y>50</y>
-         <width>371</width>
-         <height>61</height>
-        </rect>
-       </property>
-       <layout class="QVBoxLayout" name="basicInfoContainer"/>
-      </widget>
-      <widget class="QGroupBox" name="groupBox_2">
-       <property name="geometry">
-        <rect>
-         <x>60</x>
-         <y>160</y>
-         <width>371</width>
-         <height>201</height>
-        </rect>
-       </property>
-       <property name="title">
-        <string>Input Data</string>
-       </property>
-      </widget>
      </widget>
     </widget>
    </item>
