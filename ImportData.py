@@ -137,9 +137,10 @@ class ColumnSelectTable(QTableWidget):
         
 
 class ImportData(QDialog, Ui_ImportDataDialog):
-    def __init__(self):
+    def __init__(self, proj_obj):
         super().__init__()
         self.setupUi(self)
+        self.proj_obj = proj_obj
 
         # Instance Variables
         self.source_directory_path = None
@@ -553,6 +554,7 @@ class ImportData(QDialog, Ui_ImportDataDialog):
                               1,
                               int(self.numContingenciesLineEdit.text())
         )
+        dataset.setParent(self.proj_obj)
         self.returnValue = dataset
 
     #     self.showSummary()

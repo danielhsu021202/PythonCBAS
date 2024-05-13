@@ -139,7 +139,7 @@ class Project:
     def __init__(self):
         self.projectid = None
         self.project_attr = {}
-        self.datasets = {}
+        self.datasets = []
         
     def readProject(self, filepath):
         with open(filepath, 'r') as f:
@@ -151,31 +151,32 @@ class Project:
         except KeyError:
             raise KeyError("The JSON file is not in the correct format.")
         
-        self.projectid = self.project_attr["projectid"]
+        # self.projectid = self.project_attr["projectid"]
         
         for dataset in datasets:
             dataset_obj = DataSet()
             dataset_obj.readDataset(dataset)
             # datasetid = dataset_obj.getDatasetID()
-            self.datasets[datasetid] = dataset_obj
+            dataset_obj.setParent(self)
+            self.datasets.append(dataset_obj)
 
     def exportProject(self):
         """Generate the dictionary for a project object."""
         project = {
             "project_attr": self.getProjectAttr(),
-            "datasets": [dataset.exportDataset() for dataset in self.datasets.values()]
+            "datasets": [dataset.exportDataset() for dataset in self.datasets]
         }
         return project
     
     def writeProject(self):
-        filename = self.getProjectName() + ".json" #TODO: Change this to .cbasproj extension
+        filename = self.getName() + ".json" #TODO: Change this to .cbasproj extension
         filepath = os.path.join(self.getProjectDir(), filename)
         self.setDateModified(str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         with open(filepath, 'w') as f:
             json.dump(self.exportProject(), f)
 
     def createProject(self, name, description, datecreated, dir, version):
-        self.projectid = str(uuid.uuid4())
+        # self.projectid = str(uuid.uuid4())
         self.project_attr = {
             "type": "project",
             # "projectid": self.projectid,
@@ -187,22 +188,22 @@ class Project:
             "version": version
         }
 
-    def addDataset(self, datasetid, dataset_obj):
+    def addDataset(self, dataset_obj):
         # dataset_obj.setProjectID(self.projectid)
         dataset_obj.setParent(self)
-        self.datasets[datasetid] = dataset_obj
+        self.datasets.append(dataset_obj)
 
     
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: "project"
     def getProjectAttr(self) -> dict: return self.project_attr
-    def getProjectID(self) -> str: return self.projectid
+    # def getProjectID(self) -> str: return self.projectid
     def getName(self) -> str: return self.project_attr["name"]
     def getProjectDir(self) -> str: return self.project_attr["dir"]
     def getProjectVersion(self) -> str: return self.project_attr["version"]
     def getProjectDateCreated(self) -> str: return self.project_attr["datecreated"]
     def getProjectDateModified(self) -> str: return self.project_attr["datemodified"]
-    def getChildren(self) -> dict: return self.datasets
+    def getChildren(self) -> list: return self.datasets
     def getParent(self) -> None: return None
 
     ### SETTER FUNCTIONS ###
@@ -214,7 +215,7 @@ class DataSet:
         # self.datasetid = None
         # self.projectid = None
         self.parent = None
-        self.counts = {}
+        self.counts = []
         self.dataset_settings = None
 
     def readDataset(self, dataset: dict):
@@ -229,8 +230,9 @@ class DataSet:
         for count in counts:
             counts_obj = Counts()
             counts_obj.readCounts(count)
-            countsid = counts_obj.getCountsID()
-            self.counts[countsid] = counts_obj
+            # countsid = counts_obj.getCountsID()
+            counts_obj.setParent(self)
+            self.counts.append(counts_obj)
         
         self.dataset_settings = dataset["dataset_settings"]
 
@@ -241,12 +243,12 @@ class DataSet:
             # "datasetid": self.getDatasetID(),
             # "projectid": self.getProjectID(),
             "dataset_settings": self.getSettings(),
-            "counts": [count.exportCounts() for count in self.counts.values()]
+            "counts": [count.exportCounts() for count in self.counts]
         }
         return dataset
     
     def createDataset(self, name, dir, aninfoname, anInfoColumnNames, anDataColumnNames, correlational_possible, num_choices, num_modifiers, num_contingencies):
-        self.datasetid = str(uuid.uuid4())
+        # self.datasetid = str(uuid.uuid4())
         self.dataset_settings = {
             "name": name,
             "dir": dir,
@@ -261,8 +263,9 @@ class DataSet:
             }
         }
     
-    def addCountsObj(self, countsid, counts_obj):
-        self.counts[countsid] = counts_obj
+    def addCountsObj(self, counts_obj):
+        counts_obj.setParent(self)
+        self.counts.append(counts_obj)
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "dataset"
@@ -280,7 +283,8 @@ class DataSet:
     def getNumChoices(self) -> int: return self.getLanguage()["num_choices"]
     def getNumModifiers(self) -> int: return self.getLanguage()["num_modifiers"]
     def getNumContingencies(self) -> int: return self.getLanguage()["num_contingencies"]
-    def getChildren(self) -> dict: return self.counts
+    def getChildren(self) -> list: return self.counts
+    def getParent(self) -> Project: return self.parent
 
     ### SETTER FUNCTIONS ###
     # def setProjectID(self, projectid): self.projectid = projectid
@@ -291,15 +295,15 @@ class DataSet:
 
 class Counts:
     def __init__(self, ):
-        self.countsid = None
-        self.datasetid = None
-        self.resamples = {}
+        # self.countsid = None
+        # self.datasetid = None
+        self.resamples = []
         self.counts_settings = None
     
     def readCounts(self, counts):
         try:
-            self.countsid = counts["countsid"]
-            self.datasetid = counts["datasetid"]
+        #     self.countsid = counts["countsid"]
+        #     self.datasetid = counts["datasetid"]
             resamples = counts["resamples"]
         except KeyError:
             raise KeyError("Error reading in the counts.")
@@ -307,8 +311,9 @@ class Counts:
         for resample in resamples:
             resample_obj = Resamples()
             resample_obj.readResamples(resample)
-            resampleid = resample_obj.getResampleID()
-            self.resamples[resampleid] = resample_obj
+            # resampleid = resample_obj.getResampleID()
+            resample_obj.setParent(self)
+            self.resamples.append(resample_obj)
 
         self.counts_settings = counts["counts_settings"]
 
@@ -316,19 +321,19 @@ class Counts:
         """Generate the dictionary for a counts object."""
         counts = {
             "type": "counts",
-            "countsid": self.getCountsID(),
-            "datasetid": self.getDatasetID(),
+            # "countsid": self.getCountsID(),
+            # "datasetid": self.getDatasetID(),
             "counts_settings": self.getCountsSettings(),
             "criterion": self.getCriterion(),
             "max_seq_len": self.getMaxSequenceLength(),
-            "outputdir": self.getOutputDir(),
+            # "outputdir": self.getOutputDir(),
             "straddle_sessions": self.straddleSessions(),
-            "resamples": [resample.exportResamples() for resample in self.resamples.values()]
+            "resamples": [resample.exportResamples() for resample in self.resamples]
         }
         return counts
 
     def createCounts(self, name: str, order, number: int, include_failed: bool, allow_redemption: bool, max_seq_len: int, straddle_sessions: bool):
-        self.countsid = str(uuid.uuid4())
+        # self.countsid = str(uuid.uuid4())
         self.counts_settings = {
             "name": name,
             "criterion": {
@@ -341,13 +346,14 @@ class Counts:
             "straddle_sessions": straddle_sessions
         }
     
-    def addResamplesObj(self, resampleid, resample_obj):
-        self.resamples[resampleid] = resample_obj
+    def addResamplesObj(self, resample_obj):
+        resample_obj.setParent(self)
+        self.resamples.append(resample_obj)
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "counts"
-    def getCountsID(self): return self.countsid
-    def getDatasetID(self): return self.datasetid
+    # def getCountsID(self): return self.countsid
+    # def getDatasetID(self): return self.datasetid
     def getCardInfo(self): return (self.getName(), "")
     def getCountsSettings(self) -> dict: return self.counts_settings
     def getName(self) -> str: return self.counts_settings["name"]
@@ -358,21 +364,25 @@ class Counts:
     def allowRedemption(self) -> bool: return self.getCriterion()["allow_redemption"]
     def getMaxSequenceLength(self) -> int: return self.counts_settings["max_seq_len"]
     def straddleSessions(self) -> bool: return self.counts_settings["straddle_sessions"]
-    def getChildren(self) -> dict: return self.resamples
+    def getChildren(self) -> list: return self.resamples
+    def getParent(self) -> DataSet: return self.parent
+
+    ### SETTER FUNCTIONS ###
+    def setParent(self, parent:DataSet): self.parent = parent
 
 
 
 class Resamples:
     def __init__(self, ):
-        self.resampleid = None
-        self.countsid = None
-        self.pvalues = {}
+        # self.resampleid = None
+        # self.countsid = None
+        self.pvalues = []
         self.resample_settings = None
     
     def readResamples(self, resamples):
         try:
-            self.resampleid = resamples["resampleid"]
-            self.countsid = resamples["countsid"]
+            # self.resampleid = resamples["resampleid"]
+            # self.countsid = resamples["countsid"]
             pvalues = resamples["pvalues"]
         except KeyError:
             raise KeyError("Error reading in the resamples.")
@@ -380,8 +390,9 @@ class Resamples:
         for pvalue in pvalues:
             pvalue_obj = Pvalues()
             pvalue_obj.readPvalues(pvalue)
-            pvalueid = pvalue_obj.getPvalueID()
-            self.pvalues[pvalueid] = pvalue_obj
+            # pvalueid = pvalue_obj.getPvalueID()
+            pvalue_obj.setParent(self)
+            self.pvalues.append(pvalue_obj)
         
         self.resample_settings = resamples["resample_settings"]
 
@@ -389,15 +400,15 @@ class Resamples:
         """Generate the dictionary for a resamples object."""
         resamples = {
             "type": "resample",
-            "resampleid": self.getResampleID(),
-            "countsid": self.getCountsID(),
+            # "resampleid": self.getResampleID(),
+            # "countsid": self.getCountsID(),
             "resample_settings": self.getResampleSettings(),
-            "pvalues": [pvalue.exportPvalues() for pvalue in self.pvalues.values()]
+            "pvalues": [pvalue.exportPvalues() for pvalue in self.pvalues]
         }
         return resamples
     
     def createResample(self, name: str, seed, num_resamples: int, contingencies: list, groups: dict):
-        self.resampleid = str(uuid.uuid4())
+        # self.resampleid = str(uuid.uuid4())
         self.resample_settings = {
             "name": name,
             "seed": seed,
@@ -406,13 +417,14 @@ class Resamples:
             "groups": groups
         }
     
-    def addPvaluesObj(self, pvalueid, pvalue_obj):
-        self.pvalues[pvalueid] = pvalue_obj
+    def addPvaluesObj(self, pvalue_obj):
+        pvalue_obj.setParent(self)
+        self.pvalues.append(pvalue_obj)
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "resample"
-    def getResampleID(self): return self.resampleid
-    def getCountsID(self): return self.countsid
+    # def getResampleID(self): return self.resampleid
+    # def getCountsID(self): return self.countsid
     def getCardInfo(self): return (self.getName(), "")
     def getResampleSettings(self) -> dict: return self.resample_settings
     def getName(self) -> str: return self.resample_settings["name"]
@@ -420,21 +432,25 @@ class Resamples:
     def getNumResamples(self) -> int: return self.resample_settings["numresamples"]
     def getContingencies(self) -> list: return self.resample_settings["contingencies"]
     def getGroups(self) -> dict: return self.resample_settings["groups"]
-    def getChildren(self) -> dict: return self.pvalues
+    def getChildren(self) -> list: return self.pvalues
+    def getParent(self) -> Counts: return self.parent
+
+    ### SETTER FUNCTIONS ###
+    def setParent(self, parent:Counts): self.parent = parent
     
 
 
 class Pvalues:
     def __init__(self, ):
-        self.pvalueid = None
-        self.resampleid = None
-        self.visualizations = {}
+        # self.pvalueid = None
+        # self.resampleid = None
+        self.visualizations = []
         self.pvaluesettings = None
     
     def readPvalues(self, pvalues):
         try:
-            self.pvalueid = pvalues["pvalueid"]
-            resampleid = pvalues["resampleid"]
+            # self.pvalueid = pvalues["pvalueid"]
+            # resampleid = pvalues["resampleid"]
             visualizations = pvalues["visualizations"]
         except KeyError:
             raise KeyError("Error reading in the pvalues.")
@@ -442,25 +458,26 @@ class Pvalues:
         for visualization in visualizations:
             visualization_obj = Visualizations()
             visualization_obj.readVisualizations(visualization)
-            visualizationid = visualization_obj.getVisualizationID()
-            self.visualizations[visualizationid] = visualization_obj
+            # visualizationid = visualization_obj.getVisualizationID()
+            self.visualization_obj.setParent(self)
+            self.visualizations.append(visualization_obj)
 
     def exportPvalues(self):
         """Generate the dictionary for a pvalues object."""
         pvalues = {
             "type": "pvalues",
-            "pvalueid": self.getPvalueID(),
-            "resampleid": self.getResampleID(),
+            # "pvalueid": self.getPvalueID(),
+            # "resampleid": self.getResampleID(),
             "pvaluesettings": self.getPvaluesSettings(),
-            "visualizations": [visualization.exportVisualizations() for visualization in self.visualizations.values()]
+            "visualizations": [visualization.exportVisualizations() for visualization in self.visualizations]
         }
         return pvalues
 
-    def getPvalueID(self):
-        return self.pvalueid
+    # def getPvalueID(self):
+    #     return self.pvalueid
     
-    def getResampleID(self):
-        return self.resampleid
+    # def getResampleID(self):
+    #     return self.resampleid
     
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "pvalues"
@@ -468,16 +485,23 @@ class Pvalues:
     def useFDP(self) -> bool: return self.pvaluesettings["fdp"]
     def getAlpha(self) -> float: return self.pvaluesettings["alpha"]
     def getGamma(self) -> float: return self.pvaluesettings["gamma"]
+    def getChildren(self) -> list: return self.visualizations
+    def getParent(self) -> Resamples: return self.parent
+
+    ### SETTER FUNCTIONS ###
+    def setParent(self, parent:Resamples): self.parent = parent
 
     
-    def addVisualizationsObj(self, visualizationid, visualization_obj):
-        self.visualizations[visualizationid] = visualization_obj
+    def addVisualizationsObj(self, visualization_obj):
+        visualization_obj.setParent(self)
+        self.visualizations.append(visualization_obj)
 
 
 class Visualizations:
     def __init__(self, ):
-        self.pvalueid = None
-        self.visualizationid = None
+        # self.pvalueid = None
+        # self.visualizationid = None
+        pass
     
     def readVisualizations(self, visualizations):
         try:

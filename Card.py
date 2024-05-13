@@ -7,27 +7,27 @@ from settings import DataSet, next_type
 from utils import StringUtils
 
 class Card(QWidget, Ui_Card):
-    def __init__(self, item=None, parent=None):
+    def __init__(self, obj=None, parent=None):
         super(Card, self).__init__()
         self.setupUi(self)
 
-        self.item = item
+        self.obj = obj
         self.navigator = parent
 
-        if self.item:
-            self.type = self.item.getType() if self.item is not None else None
-            title, subtitle = self.item.getCardInfo()
+        if self.obj:
+            self.type = self.obj.getType() if self.obj is not None else None
+            title, subtitle = self.obj.getCardInfo()
             self.TitleLabel.setText(title)
             self.TypeLabel.setText(StringUtils.capitalizeFirstLetter(self.type))
             self.SubtitleLabel.setText(subtitle)
         
 
-        if self.item is None:
+        if self.obj is None:
             self.CardTypes.setCurrentIndex(0)
         else:
             self.CardTypes.setCurrentIndex(1)
             if next_type[self.type]:
-                self.mouseDoubleClickEvent = lambda _: self.navigator.populateItems(self.item.getChildren(), next_type[self.type])
+                self.mouseDoubleClickEvent = lambda _: self.navigator.populateItems(self.obj, next_type[self.type])
 
         # Set stylesheet
         self.setStyleSheet("""

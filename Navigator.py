@@ -2,7 +2,7 @@ from ui.NavigatorFrame import Ui_NavigatorFrame
 
 from Card import Card
 from ImportData import ImportData
-from settings import Project
+from settings import Project, prev_type
 
 from PyQt6.QtWidgets import QWidget
 from PyQt6 import QtCore
@@ -22,13 +22,22 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         # Set up card grid to fill from top left, and going left to right
         self.CardGrid.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
 
-        
+        self.backButton.clicked.connect(self.goBack)
 
-        self.project = project_obj
+        # self.project = project_obj
+        self.obj = project_obj
+        # self.prev_obj = None
 
-        self.populateItems(self.project.getChildren(), "dataset")
+        self.backButton.setDisabled(True)
 
-    
+        self.populateItems(self.obj, "dataset")
+
+    def goBack(self):
+        if self.obj.getParent() is not None:
+            self.populateItems(self.obj.getParent(), self.obj.getType())
+        else:
+            self.populateItems(self.obj, self.obj.getType())
+
     def clearCardGrid(self):
         for i in reversed(range(self.CardGrid.count())):
             widget = self.CardGrid.itemAt(i).widget()
@@ -36,12 +45,15 @@ class Navigator(QWidget, Ui_NavigatorFrame):
                 widget.deleteLater()
 
 
-    def populateItems(self, items: dict, mode: str):
+    def populateItems(self, obj, mode: str):
         self.mode = mode
+        self.obj = obj
+        self.backButton.setDisabled(self.obj.getParent() is None)
         self.clearCardGrid()
         self.TypeLabel.setText(self.mode.upper() + " BROWSER")
         max_per_row = 3
-        for i, item in enumerate(items.values()):
+        items = obj.getChildren()
+        for i, item in enumerate(items):
             card = Card(item, parent=self)
             # Add cards left to right
             self.CardGrid.addWidget(card, i // max_per_row, i % max_per_row)
@@ -58,11 +70,12 @@ class Navigator(QWidget, Ui_NavigatorFrame):
 
 
     def addDataset(self):
-        self.importData = ImportData()
+        assert type(self.obj) == Project
+        self.importData = ImportData(self.obj)
         dataset = self.importData.run()
         if dataset is not None:
-            self.project.addDataset(dataset.getDatasetID(), dataset)
-            self.project.writeProject()
-            self.populateItems(self.project.getChildren())
+            self.obj.addDataset(dataset)
+            self.obj.writeProject()
+            self.populateItems(self.obj, "dataset")
 
     

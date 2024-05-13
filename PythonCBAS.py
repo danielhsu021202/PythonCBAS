@@ -229,13 +229,13 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         
         self.project = project
 
-        self.setWindowTitle(project.getProjectName())
+        self.setWindowTitle(project.getName())
 
         self.setUpMenuBar()
 
 
 
-        # # Add the File Viewer Frame to the main staci
+        # # Add the File Viewer Frame to the main stack
         # self.fileViewer = FileViewer()
         # self.FileViewerPage.layout().addWidget(self.fileViewer)
 
