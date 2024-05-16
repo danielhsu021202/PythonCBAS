@@ -1,8 +1,8 @@
 from PyQt6 import QtCore, QtGui
-from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout
+from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout, QMenu
 
 from ui.Card_ui import Ui_Card
-from settings import DataSet, next_type
+from settings import DataSet, Counts, Resamples, next_type
 
 from utils import StringUtils
 
@@ -26,13 +26,17 @@ class Card(QWidget, Ui_Card):
             self.CardTypes.setCurrentIndex(0)
         else:
             self.CardTypes.setCurrentIndex(1)
-            if next_type[self.type]:
+            if next_type[self.type] is not None:
                 self.mouseDoubleClickEvent = lambda _: self.navigator.populateItems(self.obj, next_type[self.type])
+
+        # On right click, spawn menu
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.menuActions)
 
         # Set stylesheet
         self.setStyleSheet("""
                             #CardFrame {
-                                border: 4px solid rgb(75, 75, 75);
+                                border: 3px solid rgb(75, 75, 75);
                                 border-radius: 16px;
                                 background-color: rgb(105, 105, 105);
                             }
@@ -43,7 +47,7 @@ class Card(QWidget, Ui_Card):
                                 background-color: rgb(85, 85, 85);
                             }
                             #newItemButton {
-                                border: 4px solid rgb(75, 75, 75);
+                                border: 3px solid rgb(75, 75, 75);
                                 border-radius: 16px;
                                 background-color: rgb(105, 105, 105);
                             }
@@ -67,6 +71,30 @@ class Card(QWidget, Ui_Card):
         
         # Set size
         self.setFixedSize(300, 200)
+
+    def menuActions(self):
+        menu = QMenu(self)
+        # Type Specific Actions
+        if type(self.obj) == DataSet:
+            pass
+        elif type(self.obj) == Counts:
+            pass
+        elif type(self.obj) == Resamples:
+            pass
+        
+        menu.addSeparator()
+
+        # General Actions
+        menu.addAction("Rename")
+        menu.addAction("Delete")
+        menu.addAction("Open in FileViewer")
+
+        # Execute at mouse position
+        menu.exec(QtGui.QCursor.pos())
+
+
+        
+
 
 
 

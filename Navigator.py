@@ -2,7 +2,8 @@ from ui.NavigatorFrame import Ui_NavigatorFrame
 
 from Card import Card
 from ImportData import ImportData
-from settings import Project, prev_type
+from SettingsDialog import SettingsDialog
+from settings import Project, DataSet, Counts, Resamples, Pvalues, Visualizations, prev_type
 
 from PyQt6.QtWidgets import QWidget
 from PyQt6 import QtCore
@@ -10,11 +11,6 @@ from PyQt6 import QtCore
 class Navigator(QWidget, Ui_NavigatorFrame):
     def __init__(self, project_obj: Project, parent=None):
         """
-        mode:
-            "dataset" for dataset
-            "counts" for counts
-            "resample" for resamples
-            "pvalue" for pvalues
         """
         super(Navigator, self).__init__()
         self.setupUi(self)
@@ -26,6 +22,7 @@ class Navigator(QWidget, Ui_NavigatorFrame):
 
         # self.project = project_obj
         self.obj = project_obj
+        self.proj_obj = project_obj
         # self.prev_obj = None
 
         self.backButton.setDisabled(True)
@@ -64,18 +61,35 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         self.CardGrid.addWidget(card, len(items) // max_per_row, len(items) % max_per_row)
         self.setAddItemButton(card)
 
+        # Update the path label
+        path = [obj.getName() for obj in self.obj.retracePath()]
+        self.pathLabel.setText("  >  ".join(path))
+
     def setAddItemButton(self, card: Card):
         if self.mode == "dataset":
             card.newItemButton.clicked.connect(self.addDataset)
+        elif self.mode == "counts":
+            card.newItemButton.clicked.connect(self.addCounts)
 
 
     def addDataset(self):
         assert type(self.obj) == Project
-        self.importData = ImportData(self.obj)
-        dataset = self.importData.run()
+        importData = ImportData(self.obj)
+        dataset = importData.run()
         if dataset is not None:
             self.obj.addDataset(dataset)
             self.obj.writeProject()
             self.populateItems(self.obj, "dataset")
+
+    def addCounts(self):
+        assert type(self.obj) == DataSet
+        countsSettings = SettingsDialog("counts", proj_obj=self.proj_obj, parent_obj=self.obj)
+        counts = countsSettings.run()
+        if counts is not None:
+            self.obj.addCounts(counts)
+            self.obj.writeProject()
+            self.populateItems(self.obj, "counts")
+
+
 
     

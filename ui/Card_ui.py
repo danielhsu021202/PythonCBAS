@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_Card(object):
     def setupUi(self, Card):
         Card.setObjectName("Card")
-        Card.resize(318, 193)
+        Card.resize(545, 528)
         Card.setStyleSheet("")
         self.verticalLayout = QtWidgets.QVBoxLayout(Card)
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)

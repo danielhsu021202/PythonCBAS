@@ -22,8 +22,17 @@ prev_type = {
     "visualizations": "pvalues"
 }
 
+CONSTANTS = {
+    "NaN": -1,
+    "inf": -2
+}
+
 
 class Settings:
+    """
+    Formerly the primary settings handler for the algorithm.
+    Repurposed into a class that handles globals and common names across the algorithm.
+    """
     def __init__(self):
         self.language = {
             'NUM_CHOICES': 6,
@@ -108,6 +117,45 @@ class Settings:
     
     def getAnInfoCol(self, col_name):
         return self.animal_info_format[col_name]
+    
+    def buildLanguageDict(num_choices, num_modifiers, num_contingencies):
+        return {
+            'NUM_CHOICES': num_choices,
+            'NUM_MODIFIERS': num_modifiers,
+            'NUM_CONTINGENCIES': num_contingencies,
+        }
+    
+    def buildCriterionDict(order: int, number, include_failed: bool, allow_redemption: bool):
+        return {
+            'ORDER': order,
+            'NUMBER': number,
+            'INCLUDE_FAILED': include_failed,
+            'ALLOW_REDEMPTION': allow_redemption
+        }
+    
+    def buildCountsLanguageDict(max_sequence_length: int, straddle_sessions: bool):
+        return {
+            'MAX_SEQUENCE_LENGTH': max_sequence_length,
+            'STRADDLE_SESSIONS': straddle_sessions
+        }
+    
+    def buildDataColumnsDict(session_no_col: int, choice_col: int, contingency_col: int, modifier_col: int):
+        return {
+            'SESSION_NO_COL': session_no_col,
+            'CHOICE_COL': choice_col,
+            'CONTINGENCY_COL': contingency_col,
+            'MODIFIER_COL': modifier_col
+        }
+    
+    def getColumnOrder():
+        return ["Session", "Choice", "Contingency", "Modifier"]
+    
+    def getCountsFolderPaths(counts_folder):
+        return {
+            'ALLSEQDIR': os.path.join(counts_folder, 'All Seq'),
+            'ALLSEQALLANDIR': os.path.join(counts_folder, 'All Seq All An'),
+            'SEQCNTSDIR': os.path.join(counts_folder, 'Sequence Counts'),
+        }
 
 
     
@@ -122,22 +170,10 @@ class Settings:
         assert attr_dict.keys() == self.criterion.keys()
         self.criterion = attr_dict
 
-    
-
-            
-
-    # def setCriterion(self, order: int, number: int, include_failed: bool, allow_redemption: bool):
-    #     """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
-    #     self.criterion['ORDER'] = order
-    #     self.criterion['NUMBER'] = number
-    #     self.criterion['INCLUDE_FAILED'] = include_failed
-    #     self.criterion['ALLOW_REDEMPTION'] = allow_redemption
-
 
 
 class Project:
     def __init__(self):
-        self.projectid = None
         self.project_attr = {}
         self.datasets = []
         
@@ -151,12 +187,9 @@ class Project:
         except KeyError:
             raise KeyError("The JSON file is not in the correct format.")
         
-        # self.projectid = self.project_attr["projectid"]
-        
         for dataset in datasets:
             dataset_obj = DataSet()
             dataset_obj.readDataset(dataset)
-            # datasetid = dataset_obj.getDatasetID()
             dataset_obj.setParent(self)
             self.datasets.append(dataset_obj)
 
@@ -176,29 +209,34 @@ class Project:
             json.dump(self.exportProject(), f)
 
     def createProject(self, name, description, datecreated, dir, version):
-        # self.projectid = str(uuid.uuid4())
+        # Create a folder for the project
+        project_dir = os.path.join(dir, name)
+        if not os.path.exists(project_dir):
+            os.makedirs(project_dir)
         self.project_attr = {
             "type": "project",
-            # "projectid": self.projectid,
             "name": name,
             "description": description,
             "datecreated": datecreated,
             "datemodified": datecreated,
-            "dir": dir,
+            "dir": project_dir,
             "version": version
         }
 
     def addDataset(self, dataset_obj):
-        # dataset_obj.setProjectID(self.projectid)
         dataset_obj.setParent(self)
         self.datasets.append(dataset_obj)
+
+    def retracePath(self):
+        return [self]
 
     
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: "project"
     def getProjectAttr(self) -> dict: return self.project_attr
-    # def getProjectID(self) -> str: return self.projectid
+    def getFilepath(self) -> str: return os.path.join(self.getProjectDir(), self.getName() + ".json")
     def getName(self) -> str: return self.project_attr["name"]
+    def getDescription(self) -> str: return self.project_attr["description"]
     def getProjectDir(self) -> str: return self.project_attr["dir"]
     def getProjectVersion(self) -> str: return self.project_attr["version"]
     def getProjectDateCreated(self) -> str: return self.project_attr["datecreated"]
@@ -212,8 +250,6 @@ class Project:
 
 class DataSet:
     def __init__(self):
-        # self.datasetid = None
-        # self.projectid = None
         self.parent = None
         self.counts = []
         self.dataset_settings = None
@@ -221,8 +257,6 @@ class DataSet:
     def readDataset(self, dataset: dict):
         try:
             assert dataset["type"] == "dataset"
-            # self.datasetid = dataset["datasetid"]
-            # self.projectid = dataset["projectid"]
             counts = dataset["counts"]
         except KeyError:
             raise KeyError("Error reading in the datasets.")
@@ -230,7 +264,6 @@ class DataSet:
         for count in counts:
             counts_obj = Counts()
             counts_obj.readCounts(count)
-            # countsid = counts_obj.getCountsID()
             counts_obj.setParent(self)
             self.counts.append(counts_obj)
         
@@ -240,54 +273,55 @@ class DataSet:
         """Generate the dictionary for a dataset object."""
         dataset = {
             "type": "dataset",
-            # "datasetid": self.getDatasetID(),
-            # "projectid": self.getProjectID(),
             "dataset_settings": self.getSettings(),
             "counts": [count.exportCounts() for count in self.counts]
         }
         return dataset
     
-    def createDataset(self, name, dir, aninfoname, anInfoColumnNames, anDataColumnNames, correlational_possible, num_choices, num_modifiers, num_contingencies):
-        # self.datasetid = str(uuid.uuid4())
+    def createDataset(self, name, description, dir, aninfoname, anInfoColumnNames, anDataColumnNames, correlational_possible, num_choices, hasModifier, num_contingencies, num_animals):
+        anInfoColumnsDict = {name: index for index, name in enumerate(anInfoColumnNames)}
+        #TODO: AN DATA COL NAMES
         self.dataset_settings = {
             "name": name,
+            "description": description,
             "dir": dir,
             "aninfoname": aninfoname,
             "anInfoColumnNames": anInfoColumnNames,
             "anDataColumnNames": anDataColumnNames,
             "correlational_possible": correlational_possible,
-            "language": {
-                "num_choices": num_choices,
-                "num_modifiers": num_modifiers,
-                "num_contingencies": num_contingencies
-            }
+            "language": Settings.buildLanguageDict(num_choices, hasModifier, num_contingencies),
+            "num_animals": num_animals,
         }
     
-    def addCountsObj(self, counts_obj):
+    def addCounts(self, counts_obj):
         counts_obj.setParent(self)
         self.counts.append(counts_obj)
 
+    def writeProject(self):
+        self.getParent().writeProject()
+
+    def retracePath(self):
+        return self.getParent().retracePath() + [self]
+
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "dataset"
-    # def getProjectID(self): return self.projectid
-    # def getDatasetID(self): return self.datasetid
     def getCardInfo(self) -> tuple: return (self.getName(), StringUtils.lastNChars(self.getDir(), 40))
     def getSettings(self) -> dict: return self.dataset_settings
     def getName(self) -> str: return self.dataset_settings["name"]
     def getDir(self) -> str: return self.dataset_settings["dir"]
     def getAnInfoName(self) -> str: return self.dataset_settings["aninfoname"]
     def getAnInfoColumnNames(self) -> list: return self.dataset_settings["anInfoColumnNames"]
-    def getAnDataColumnNames(self) -> list: return self.dataset_settings["anDataColumnNames"]
+    def getAnDataColumnNames(self) -> dict: return self.dataset_settings["anDataColumnNames"]
     def correlationalPossible(self) -> bool: return self.dataset_settings["correlational_possible"]
+    def getNumAnimals(self) -> int: return self.dataset_settings["num_animals"]
     def getLanguage(self) -> dict: return self.dataset_settings["language"]
-    def getNumChoices(self) -> int: return self.getLanguage()["num_choices"]
-    def getNumModifiers(self) -> int: return self.getLanguage()["num_modifiers"]
-    def getNumContingencies(self) -> int: return self.getLanguage()["num_contingencies"]
+    def getNumChoices(self) -> int: return self.getLanguage()["NUM_CHOICES"]
+    def getHasModifier(self) -> int: return self.getLanguage()["HAS_MODIFIER"]
+    def getNumContingencies(self) -> int: return self.getLanguage()["NUM_CONTINGENCIES"]
     def getChildren(self) -> list: return self.counts
     def getParent(self) -> Project: return self.parent
 
     ### SETTER FUNCTIONS ###
-    # def setProjectID(self, projectid): self.projectid = projectid
     def setParent(self, parent): self.parent = parent
     
         
@@ -295,15 +329,11 @@ class DataSet:
 
 class Counts:
     def __init__(self, ):
-        # self.countsid = None
-        # self.datasetid = None
         self.resamples = []
         self.counts_settings = None
     
     def readCounts(self, counts):
         try:
-        #     self.countsid = counts["countsid"]
-        #     self.datasetid = counts["datasetid"]
             resamples = counts["resamples"]
         except KeyError:
             raise KeyError("Error reading in the counts.")
@@ -311,7 +341,6 @@ class Counts:
         for resample in resamples:
             resample_obj = Resamples()
             resample_obj.readResamples(resample)
-            # resampleid = resample_obj.getResampleID()
             resample_obj.setParent(self)
             self.resamples.append(resample_obj)
 
@@ -321,49 +350,43 @@ class Counts:
         """Generate the dictionary for a counts object."""
         counts = {
             "type": "counts",
-            # "countsid": self.getCountsID(),
-            # "datasetid": self.getDatasetID(),
             "counts_settings": self.getCountsSettings(),
             "criterion": self.getCriterion(),
             "max_seq_len": self.getMaxSequenceLength(),
-            # "outputdir": self.getOutputDir(),
             "straddle_sessions": self.straddleSessions(),
             "resamples": [resample.exportResamples() for resample in self.resamples]
         }
         return counts
 
-    def createCounts(self, name: str, order, number: int, include_failed: bool, allow_redemption: bool, max_seq_len: int, straddle_sessions: bool):
-        # self.countsid = str(uuid.uuid4())
+    def createCounts(self, name: str, description: str, criterion_dict: dict, counts_language_dict: dict):
         self.counts_settings = {
             "name": name,
-            "criterion": {
-                "order": order,
-                "number": number,
-                "include_failed": include_failed,
-                "allow_redemption": allow_redemption
-            },
-            "max_seq_len": max_seq_len,
-            "straddle_sessions": straddle_sessions
+            "description": description,
+            "criterion": criterion_dict,
+            "counts_language": counts_language_dict,
         }
     
     def addResamplesObj(self, resample_obj):
         resample_obj.setParent(self)
         self.resamples.append(resample_obj)
 
+    def retracePath(self):
+        return self.getParent().retracePath() + [self]
+
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "counts"
-    # def getCountsID(self): return self.countsid
-    # def getDatasetID(self): return self.datasetid
-    def getCardInfo(self): return (self.getName(), "")
+    def getCardInfo(self): return (self.getName(), self.getDescription())
     def getCountsSettings(self) -> dict: return self.counts_settings
     def getName(self) -> str: return self.counts_settings["name"]
+    def getDescription(self) -> str: return self.counts_settings["description"]
     def getCriterion(self) -> dict: return self.counts_settings["criterion"]
-    def getOrder(self) -> list: return self.getCriterion()["order"]
-    def getNumber(self) -> int: return self.getCriterion()["number"]
-    def includeFailed(self) -> bool: return self.getCriterion()["include_failed"]
-    def allowRedemption(self) -> bool: return self.getCriterion()["allow_redemption"]
-    def getMaxSequenceLength(self) -> int: return self.counts_settings["max_seq_len"]
-    def straddleSessions(self) -> bool: return self.counts_settings["straddle_sessions"]
+    def getOrder(self) -> list: return self.getCriterion()["ORDER"]
+    def getNumber(self) -> int: return self.getCriterion()["NUMBER"]
+    def includeFailed(self) -> bool: return self.getCriterion()["INCLUDE_FAILED"]
+    def allowRedemption(self) -> bool: return self.getCriterion()["ALLOW_REDEMPTION"]
+    def getCountsLanguage(self) -> dict: return self.counts_settings["counts_language"]
+    def getMaxSequenceLength(self) -> int: return self.getCountsLanguage()["MAX_SEQUENCE_LENGTH"]
+    def straddleSessions(self) -> bool: return self.getCountsLanguage()["STRADDLE_SESSIONS"]
     def getChildren(self) -> list: return self.resamples
     def getParent(self) -> DataSet: return self.parent
 
@@ -374,15 +397,11 @@ class Counts:
 
 class Resamples:
     def __init__(self, ):
-        # self.resampleid = None
-        # self.countsid = None
         self.pvalues = []
         self.resample_settings = None
     
     def readResamples(self, resamples):
         try:
-            # self.resampleid = resamples["resampleid"]
-            # self.countsid = resamples["countsid"]
             pvalues = resamples["pvalues"]
         except KeyError:
             raise KeyError("Error reading in the resamples.")
@@ -390,7 +409,6 @@ class Resamples:
         for pvalue in pvalues:
             pvalue_obj = Pvalues()
             pvalue_obj.readPvalues(pvalue)
-            # pvalueid = pvalue_obj.getPvalueID()
             pvalue_obj.setParent(self)
             self.pvalues.append(pvalue_obj)
         
@@ -400,15 +418,12 @@ class Resamples:
         """Generate the dictionary for a resamples object."""
         resamples = {
             "type": "resample",
-            # "resampleid": self.getResampleID(),
-            # "countsid": self.getCountsID(),
             "resample_settings": self.getResampleSettings(),
             "pvalues": [pvalue.exportPvalues() for pvalue in self.pvalues]
         }
         return resamples
     
     def createResample(self, name: str, seed, num_resamples: int, contingencies: list, groups: dict):
-        # self.resampleid = str(uuid.uuid4())
         self.resample_settings = {
             "name": name,
             "seed": seed,
@@ -421,10 +436,11 @@ class Resamples:
         pvalue_obj.setParent(self)
         self.pvalues.append(pvalue_obj)
 
+    def retracePath(self):
+        return self.getParent().retracePath() + [self]
+
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "resample"
-    # def getResampleID(self): return self.resampleid
-    # def getCountsID(self): return self.countsid
     def getCardInfo(self): return (self.getName(), "")
     def getResampleSettings(self) -> dict: return self.resample_settings
     def getName(self) -> str: return self.resample_settings["name"]
@@ -442,15 +458,11 @@ class Resamples:
 
 class Pvalues:
     def __init__(self, ):
-        # self.pvalueid = None
-        # self.resampleid = None
         self.visualizations = []
         self.pvaluesettings = None
     
     def readPvalues(self, pvalues):
         try:
-            # self.pvalueid = pvalues["pvalueid"]
-            # resampleid = pvalues["resampleid"]
             visualizations = pvalues["visualizations"]
         except KeyError:
             raise KeyError("Error reading in the pvalues.")
@@ -458,7 +470,7 @@ class Pvalues:
         for visualization in visualizations:
             visualization_obj = Visualizations()
             visualization_obj.readVisualizations(visualization)
-            # visualizationid = visualization_obj.getVisualizationID()
+
             self.visualization_obj.setParent(self)
             self.visualizations.append(visualization_obj)
 
@@ -466,18 +478,10 @@ class Pvalues:
         """Generate the dictionary for a pvalues object."""
         pvalues = {
             "type": "pvalues",
-            # "pvalueid": self.getPvalueID(),
-            # "resampleid": self.getResampleID(),
             "pvaluesettings": self.getPvaluesSettings(),
             "visualizations": [visualization.exportVisualizations() for visualization in self.visualizations]
         }
         return pvalues
-
-    # def getPvalueID(self):
-    #     return self.pvalueid
-    
-    # def getResampleID(self):
-    #     return self.resampleid
     
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "pvalues"
@@ -499,8 +503,6 @@ class Pvalues:
 
 class Visualizations:
     def __init__(self, ):
-        # self.pvalueid = None
-        # self.visualizationid = None
         pass
     
     def readVisualizations(self, visualizations):
@@ -518,21 +520,44 @@ class Visualizations:
             "visualizationid": self.getVisualizationID()
         }
         return visualizations
-
-    def getPvalueID(self):
-        return self.pvalueid
-
-    def getVisualizationID(self):
-        return self.visualizationid
     
 
 
 class Preferences:
-    def __init__(self, ):
-        pass
+    def __init__(self, preferences_filepath):
+        self.preferences_filepath = preferences_filepath
+        self.recentlyOpened = set()
     
-    def readPreferences(self, preferences):
-        pass
+    def readPreferences(self, filepath):
+        with open(filepath, 'r') as f:
+            data = FileUtils.readJSON(f)
+
+        try:
+            self.recentlyOpened = set(data["recentlyOpened"])
+        except KeyError:
+            raise KeyError("Problem importing preferences.")
+        
+    def exportPreferences(self):
+        """Generate the dictionary for a preferences object."""
+        preferences = {
+            "recentlyOpened": list(self.recentlyOpened)
+        }
+        return preferences
+    
+    def writePreferences(self):
+        with open(self.preferences_filepath, 'w') as f:
+            json.dump(self.exportPreferences(), f)
+
+    def addRecentlyOpened(self, filepath):
+        self.recentlyOpened.add(filepath)
+        self.writePreferences()
+
+    def getRecentlyOpened(self):
+        return self.recentlyOpened
+
+
+
+        
 
 
 

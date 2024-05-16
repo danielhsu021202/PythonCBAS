@@ -55,7 +55,7 @@
    <item>
     <widget class="QStackedWidget" name="mainStack">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="StartPage">
       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -120,10 +120,29 @@
         </widget>
        </item>
        <item>
-        <widget class="QListView" name="recentProjectsList">
-         <property name="autoFillBackground">
-          <bool>true</bool>
+        <widget class="QTableWidget" name="recentlyOpenedTable">
+         <property name="horizontalScrollBarPolicy">
+          <enum>Qt::ScrollBarAlwaysOff</enum>
          </property>
+         <property name="showGrid">
+          <bool>false</bool>
+         </property>
+         <attribute name="horizontalHeaderStretchLastSection">
+          <bool>true</bool>
+         </attribute>
+         <attribute name="verticalHeaderVisible">
+          <bool>false</bool>
+         </attribute>
+         <column>
+          <property name="text">
+           <string>Project</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Last Modified</string>
+          </property>
+         </column>
         </widget>
        </item>
       </layout>

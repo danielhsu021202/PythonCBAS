@@ -60,7 +60,7 @@
    <item row="0" column="1">
     <widget class="QStackedWidget" name="Pages">
      <property name="currentIndex">
-      <number>4</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="DatasetAttributesPage">
       <layout class="QVBoxLayout" name="verticalLayout_12">

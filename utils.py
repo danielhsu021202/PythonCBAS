@@ -65,7 +65,8 @@ class FileUtils:
     
     def writeMatrix(file, mat, filetype='txt', delimiter=',', fmt='%d'):
         """Writes a numpy matrix to a text file. Don't write an extra line"""
-        np.savetxt(file, mat, delimiter=delimiter, fmt=fmt)
+        with open(file, 'w') as f:
+            np.savetxt(f, mat, delimiter=delimiter, fmt=fmt)
 
     def getMatrixNpy(file):
         """Loads a numpy matrix from a .npy file."""
@@ -108,6 +109,11 @@ class FileUtils:
     def readJSON(filepath):
         """Read a JSON object from a file."""
         return json.load(filepath)
+    
+    def validFile(filepath):
+        """Returns True if the file is not hidden (starts with '.')"""
+        if os.path.isfile(filepath):
+            return not os.path.basename(filepath).startswith('.')
 
             
 class MatrixUtils:

@@ -16,8 +16,10 @@ import time
 from random import randint
 
 from files import FileManager, CBASFile
-from settings import Settings
+from settings import Settings, CONSTANTS
 from utils import HexUtils, FileUtils
+
+from PyQt6.QtCore import QThread, pyqtSignal
 
 
 
@@ -28,13 +30,13 @@ class SequenceManager:
     """
     # next_number = 0  # The next number to assign to a new sequence
 
-    def __init__(self, cont: int, length: int, LANGUAGE):
+    def __init__(self, cont: int, length: int, LANGUAGE, num_animals: int):
 
         self.next_number = 0  # The next number to assign to a new sequence
 
         self.seq_nums = {}  # Maps sequences to numbers
         self.animal_trials = []  # This is a 2D array for allSeqAllAn
-        self.seq_counts = np.zeros((1, 1)) # This is a 2D array for seqCnts
+        self.seq_counts = np.zeros((num_animals, 1)) # This is a 2D array for seqCnts
 
         self.LANGUAGE = LANGUAGE
 
@@ -115,33 +117,33 @@ class SequenceManager:
         # self.seq_counts = self.seq_counts[:, np.any(self.seq_counts, axis=0)]
         
         
-    def genAllSeqFile(self, FILES, cont, seq_len):
+    def genAllSeqFile(self, dir, cont, seq_len):
         """
         Generate the allSeq file for this sequence length and contingency.
         """
         # Turn into a 2D array
         mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
         cbas_file = CBASFile(f'allSeq_{cont}_{seq_len}', mat)
-        cbas_file.saveFile(FILES['ALLSEQDIR'])
+        cbas_file.saveFile(dir)
         # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
     
-    def genAllSeqAllAnFile(self, FILES, cont, seq_len):
+    def genAllSeqAllAnFile(self, dir, cont, seq_len):
         """
         Generate the allSeqAllAn file for this sequence length and contingency.
         """
         # Turn into a 2D array
         mat = np.array(self.animal_trials)
         cbas_file = CBASFile(f'allSeqAllAn_{cont}_{seq_len}', mat)
-        cbas_file.saveFile(FILES['ALLSEQALLANDIR'])
+        cbas_file.saveFile(dir)
         # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
 
-    def genSeqCntsFile(self, FILES, cont, seq_len):
+    def genSeqCntsFile(self, dir, cont, seq_len):
         """
         Generate the seqCnts file for this sequence length and contingency.
         """
         name = f'seqCnts_{cont}_{seq_len}'
         cbasFile = CBASFile(name, self.seq_counts.astype(int))
-        cbasFile.saveFile(FILES['SEQCNTSDIR'], use_sparsity_csr=True, dtype=int)
+        cbasFile.saveFile(dir, use_sparsity_csr=True, dtype=int)
         # FileUtils.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
     
     def numUniqueSeqs(self):
@@ -158,17 +160,27 @@ class SequenceManager:
     
         
 
-class SequencesProcessor:
-    def __init__(self, settings:Settings):
+class SequencesProcessor(QThread):
+    start_scan_signal = pyqtSignal()
+    scan_progress_signal = pyqtSignal(tuple)
+    finished_signal = pyqtSignal()
+    scan_complete_signal = pyqtSignal(list)
+    def __init__(self, dataset_dir, anDataColumnNames: dict, language: dict, criterion: dict, counts_language: dict, num_animals: int):
+        super(SequencesProcessor, self).__init__()
+
         # Import Settings
-        self.FILES = settings.getFiles()
-        self.COLUMNS = settings.getAnimalFileFormat()
-        self.LANGUAGE = settings.getLanguage()
-        self.CRITERION = settings.getCriterion()
-        self.CONSTANTS = settings.getConstants()
+        # self.FILES = settings.getFiles()
+        self.dataset_dir = dataset_dir
+        self.counts_dir = os.path.join(self.dataset_dir, 'Counts')
+        self.setupFiles()
+        self.COLUMNS = anDataColumnNames
+        self.LANGUAGE = {**language, **counts_language}
+        self.CRITERION = criterion
+        self.CONSTANTS = CONSTANTS
+        self.num_animals = num_animals
 
         # For analysis, 2D array with length of sequence as rows, contingency as columns, and number of sequences as values
-        self.sequence_matrix = [[SequenceManager(cont, seq_len+1, self.LANGUAGE) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
+        self.sequence_matrix = [[SequenceManager(cont, seq_len+1, self.LANGUAGE, self.num_animals) for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for seq_len in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])]
         self.criterion_matrix = None  # This is initialized in the processAllAnimals() function
         self.seq_rates_df = None  # This is initialized in the getSequenceRates() function
         self.current_animal_num = self.CONSTANTS['NaN']
@@ -178,7 +190,17 @@ class SequencesProcessor:
 
         self.missing_contingencies = {}  # Maps contingency to a list of animals that did not participate in that contingency
 
+    def setupFiles(self):
+        """Set up the file paths for the counts files."""
+        if os.path.exists(self.counts_dir):
+            shutil.rmtree(self.counts_dir)
+        os.makedirs(self.counts_dir)
+
+        for folder in Settings.getCountsFolderPaths(self.counts_dir).values():
+            os.makedirs(folder)
+
     def dumpMemory(self):
+        """Dump the memory of the object to save space."""
         self.sequence_matrix = None
         self.criterion_matrix = None
         self.seq_rates_df = None
@@ -220,7 +242,7 @@ class SequencesProcessor:
             self.criterion_matrix[self.current_animal_num][cont] = (min(new_trial_num, self.CRITERION['NUMBER']), self.CONSTANTS['NaN'])
             return new_trial_num >= self.CRITERION['NUMBER']
         else:
-            num_accomplished, _ = self.criterion_matrix[self.current_animal_num][cont]    
+            num_accomplished, _ = self.criterion_matrix[self.current_animal_num][cont]
             if num_accomplished == self.CRITERION['NUMBER']: 
                 return True # If the criterion number has already been reached, we're done
             if self.perfectPerformance(sequence):
@@ -236,7 +258,7 @@ class SequencesProcessor:
             return False
         return all([num >= self.LANGUAGE['NUM_CHOICES'] for num in sequence])
 
-    def postProcessCriterionMatrixCurrAnimalRow(self):
+    def postProcessCriterionMatrixCurrAnimalRow(self, use_num_accomplished):
         """
         Post-process the criterion matrix to exclude animals that did not reach the criterion.
         Turns the tuples into a single number, inf if the criterion was not reached, and 0 if the subject did not participate in that contingency.
@@ -248,12 +270,16 @@ class SequencesProcessor:
         else:
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
                 num_accomplished, trial_num = self.criterion_matrix[self.current_animal_num][cont]
-                if num_accomplished == self.CONSTANTS['NaN']:
-                    self.criterion_matrix[self.current_animal_num][cont] = self.CONSTANTS['NaN']
-                elif num_accomplished < self.CRITERION['NUMBER']:
-                    self.criterion_matrix[self.current_animal_num][cont] = self.CONSTANTS['inf']
+                if use_num_accomplished:
+                    # If we're using the number accomplished, (which is the case when we're scanning the criterion), then we just set the criterion matrix to the number accomplished
+                    self.criterion_matrix[self.current_animal_num][cont] = num_accomplished
                 else:
-                    self.criterion_matrix[self.current_animal_num][cont] = trial_num
+                    if num_accomplished == self.CONSTANTS['NaN']:
+                        self.criterion_matrix[self.current_animal_num][cont] = self.CONSTANTS['NaN']
+                    elif num_accomplished < self.CRITERION['NUMBER'] and self.CRITERION['NUMBER'] != float('inf'):
+                        self.criterion_matrix[self.current_animal_num][cont] = self.CONSTANTS['inf']
+                    else:
+                        self.criterion_matrix[self.current_animal_num][cont] = trial_num
 
     def findCriterionTrial(self, cont: int):
         """
@@ -304,8 +330,11 @@ class SequencesProcessor:
         Keeps other columns the same. Result has one less column.
         ASSUMES the order of the columns is session_no, choice, modifier, contingency.
         """
-        mat[:, self.COLUMNS['CHOICE_COL']] = mat[:, self.COLUMNS['CHOICE_COL']] + mat[:, self.COLUMNS['MODIFIER_COL']] * self.LANGUAGE['NUM_CHOICES']
-        return np.delete(mat, self.COLUMNS['MODIFIER_COL'], 1)
+        if self.COLUMNS['MODIFIER_COL'] is not None:
+            mat[:, self.COLUMNS['CHOICE_COL']] = mat[:, self.COLUMNS['CHOICE_COL']] + mat[:, self.COLUMNS['MODIFIER_COL']] * self.LANGUAGE['NUM_CHOICES']
+            return np.delete(mat, self.COLUMNS['MODIFIER_COL'], 1)
+        else:
+            return mat
 
     def splitContingency(self, mat):
         """
@@ -321,20 +350,19 @@ class SequencesProcessor:
             # Set the trial # to -1 for in the criterion_matrix
             self.updateCriterionMatrix(missing_contingency, None, None)
             self.registerMissingContingency(missing_contingency)  # Register the missing contingency for the current animal
-
         # Split the matrix horizontally by the contingency column
         by_contingency = np.split(mat, np.where(np.diff(mat[:, self.COLUMNS['CONTINGENCY_COL']]))[0] + 1)
         # Return an array of tuples: each tuple contains the sub-matrix with the contingency column removed, as well as the contingency value.
         return [(np.delete(submat, self.COLUMNS['CONTINGENCY_COL'], 1), submat[0, self.COLUMNS['CONTINGENCY_COL']]) for submat in by_contingency]
 
-    def getAllLengthSequences(self, mats: list[tuple[np.array, int]]):
+    def getAllLengthSequences(self, mats: list[tuple[np.array, int]], scanCriterion=False):
         """
         Takes a list of tuples: (mat, cont)
         Get all sequences of length up to MAX_SEQUENCE_LENGTH for each contingency.
         This gets run once per animal.
         """
         for mat, cont in mats:
-            lengths = set(np.arange(1, self.LANGUAGE['MAX_SEQUENCE_LENGTH'] + 1))
+            lengths = set([self.CRITERION['ORDER']]) if scanCriterion else set(np.arange(1, self.LANGUAGE['MAX_SEQUENCE_LENGTH'] + 1))
             if self.CRITERION['ORDER'] == 0:
                 # Then pass in the total number of trials performed
                 self.updateCriterionMatrix(cont, len(mat), None, orderZero=True)
@@ -343,8 +371,9 @@ class SequencesProcessor:
                 self.getSequences(mat, self.CRITERION['ORDER'], cont, is_order_length=True)
                 lengths.remove(self.CRITERION['ORDER'])
             # For each remaining length, get all the sequences
-            for length in lengths:
-                self.getSequences(mat, length, cont, is_order_length=False)
+            if not scanCriterion:
+                for length in lengths:
+                    self.getSequences(mat, length, cont, is_order_length=False)
 
     def getSequences(self, mat, length: int, cont: int, is_order_length: bool):
         """
@@ -385,25 +414,30 @@ class SequencesProcessor:
     
     
 
-    def processAllAnimals(self):
+    def processAllAnimals(self, scanCriterion=False):
         """
         ONE OF MAIN CALLED FUNCTION FOR THIS MODULE
         Goes through all the animals and processes their sequences, registering them to the SequenceManager contained in 
         self.sequence_matrix.
         """
-        all_paths = FileUtils.unpickleObj(os.path.join(self.FILES['METADATA'], 'all_paths.pkl'))
+        all_paths = FileUtils.unpickleObj(os.path.join(self.dataset_dir, 'all_paths.pkl'))
         self.total_animals = len(all_paths)
         self.criterion_matrix = [[(0, 0) for _ in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for _ in np.arange(self.total_animals)]
+        self.start_scan_signal.emit()
         for animal_num, animal in enumerate(all_paths):
+            cohort_and_animal = animal.split(os.sep)[-2:]
+            self.scan_progress_signal.emit((animal_num, f'{cohort_and_animal[0]}/{cohort_and_animal[1]}'))
             self.current_animal_num = animal_num
             mat = self.getMatrix(animal)
             mat = self.collapseModifiers(mat)
             mats_by_cont = self.splitContingency(mat)
-            self.getAllLengthSequences(mats_by_cont)
-            self.postProcessCriterionMatrixCurrAnimalRow()
+            self.getAllLengthSequences(mats_by_cont, scanCriterion=scanCriterion)
+            self.postProcessCriterionMatrixCurrAnimalRow(use_num_accomplished=scanCriterion)
+
         
         # Trim the sequence counts matrices
-        for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
+        lengths = [self.CRITERION['ORDER']] if scanCriterion else np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])
+        for length in lengths:
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
                 self.sequence_matrix[length][cont].trimSeqCnts()
 
@@ -415,6 +449,21 @@ class SequencesProcessor:
                 seq_manager.setParticipationSeqCnts(self.missing_contingencies[missing_cont], self.CONSTANTS['NaN'])
 
         return self.sequence_matrix
+    
+    def getCriterionMatrix(self):
+        """Returns the criterion matrix."""
+        return self.criterion_matrix
+    
+    def scanCriterionOrder(self):
+        """
+        Scans the criterion order for all animals and returns the min and max of the criterion matrix
+        """
+        self.processAllAnimals(scanCriterion=True)
+        criterion_matrix = self.getCriterionMatrix()
+        # FileUtils.writeMatrix(os.path.join(self.counts_dir, 'criterionMatrix_scan.txt'), criterion_matrix)
+        print(type(criterion_matrix))
+        self.scan_complete_signal.emit(criterion_matrix)
+
 
     def generateSequenceFiles(self):
         """
@@ -422,16 +471,16 @@ class SequencesProcessor:
         Generates the allSeq and allSeqAllAn files for each sequence length and contingency.
         Also generates the criterionMatrix file.
         """
+        counts_folders = Settings.getCountsFolderPaths(self.counts_dir)
         for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
-                self.sequence_matrix[length][cont].genAllSeqFile(self.FILES, cont, length+1)
-                self.sequence_matrix[length][cont].genAllSeqAllAnFile(self.FILES, cont, length+1)
-                self.sequence_matrix[length][cont].genSeqCntsFile(self.FILES, cont, length+1)
+                self.sequence_matrix[length][cont].genAllSeqFile(counts_folders['ALLSEQDIR'], cont, length+1)
+                self.sequence_matrix[length][cont].genAllSeqAllAnFile(counts_folders['AllSEQALLANDIR'], cont, length+1)
+                self.sequence_matrix[length][cont].genSeqCntsFile(counts_folders['SEQCNTSDIR'], cont, length+1)
         
         # Write the criterion matrix to a file
-        FileUtils.writeMatrix(os.path.join(self.FILES['OUTPUT'], 
-                                             f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}_{self.CRITERION["INCLUDE_FAILED"]}_{self.CRITERION["ALLOW_REDEMPTION"]}.txt'), 
-                                self.criterion_matrix)
+        criterion_mat_file = CBASFile(f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}', self.criterion_matrix)
+        criterion_mat_file.saveFile(self.counts_dir, dtype=int)
         
     def buildSeqNumIndex(self, all_seq_cnts, conts='all'):
         """
@@ -500,7 +549,8 @@ class SequencesProcessor:
         """
         cont, length, seq_num = self.locateSequenceNumber(index)
         # Look for the sequence in the file
-        file = CBASFile.loadFile(os.path.join(self.FILES['ALLSEQDIR'], f'allSeq_{cont}_{length}.cbas'))
+        all_seq_dir = Settings.getCountsFolderPaths(self.counts_dir)['ALLSEQDIR']
+        file = CBASFile.loadFile(os.path.join(all_seq_dir, f'allSeq_{cont}_{length}.cbas'))
         mat = file.data
         
         # Get the seq_num'th row

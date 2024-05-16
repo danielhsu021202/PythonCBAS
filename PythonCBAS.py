@@ -12,7 +12,7 @@ import re
 import argparse
 import datetime
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QFileDialog, QMessageBox, QDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QFileDialog, QMessageBox, QDialog, QTableWidgetItem, QTableWidget
 from PyQt6.QtGui import QPalette, QColor
 from PyQt6.QtCore import Qt
 
@@ -25,7 +25,7 @@ from FileViewer import FileViewer
 from Navigator import Navigator
 from ImportData import ImportData
 from Card import Card
-from settings import Project
+from settings import Project, Preferences
 
 
 
@@ -80,7 +80,7 @@ def startCBASTerminal(num_samples):
     print(divider)
     section_start = time.time()
     print("Processing sequences and calculating criterion...")
-    sequencesProcessor = SequencesProcessor(settings)
+    sequencesProcessor = SequencesProcessor("output_new", settings.getAnimalFileFormat(), settings.getLanguage(), CRITERION, {}, 245)
     sequencesProcessor.processAllAnimals()
     print("Sequences and criterion processed. Time taken: ", format_time(time.time() - section_start))
 
@@ -160,10 +160,13 @@ def startCBASTerminal(num_samples):
 
 
 class Lobby(QDialog, Ui_Lobby):
-    def __init__(self):
+    def __init__(self, preferences: Preferences):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("PythonCBAS")
+
+        self.preferences = preferences
+        self.setupRecentlyOpened()
 
         self.mainStack.setCurrentIndex(0)
         self.newProjectButton.clicked.connect(lambda: self.mainStack.setCurrentIndex(1))
@@ -171,6 +174,9 @@ class Lobby(QDialog, Ui_Lobby):
         self.createProjectButton.clicked.connect(self.createProject)
         self.projectLocationButton.clicked.connect(self.getDirectory)
         self.openProjectButton.clicked.connect(self.getProject)
+
+        # Table highlight whole row at same time
+        self.recentlyOpenedTable.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
 
         self.returnValue = None
 
@@ -208,6 +214,7 @@ class Lobby(QDialog, Ui_Lobby):
         project.createProject(self.projectNameField.text(), self.descriptionTextEdit.toPlainText(), 
                               datecreated, self.projectLocationField.text(), "beta")
         project.writeProject()
+        self.preferences.addRecentlyOpened(filepath)
         self.returnValue = project
         self.close()
 
@@ -215,8 +222,34 @@ class Lobby(QDialog, Ui_Lobby):
         """Load a project from a .json or .cbasproj file."""
         project = Project()
         project.readProject(filepath)
+        self.preferences.addRecentlyOpened(filepath)
         self.returnValue = project
         self.close()
+
+    def setupRecentlyOpened(self):
+        self.recentlyOpenedTable.clear()
+
+        # Initialize first column size
+        self.recentlyOpenedTable.setColumnWidth(0, 200)
+
+        # Set headers
+        self.recentlyOpenedTable.setHorizontalHeaderLabels(["Project", "Last Modified"])
+
+        recently_opened = self.preferences.getRecentlyOpened()
+        for i, filepath in enumerate(recently_opened):
+            self.recentlyOpenedTable.insertRow(i)
+            project = Project()
+            project.readProject(filepath)
+            nameitem = QTableWidgetItem(project.getName())
+            nameitem.setData(Qt.ItemDataRole.UserRole, filepath)
+            self.recentlyOpenedTable.setItem(i, 0, nameitem)
+            dateitem = QTableWidgetItem(project.getProjectDateModified())
+            dateitem.setData(Qt.ItemDataRole.UserRole, filepath)
+            self.recentlyOpenedTable.setItem(i, 1, dateitem)
+
+        self.recentlyOpenedTable.cellDoubleClicked.connect(lambda: self.loadProject(self.recentlyOpenedTable.currentItem().data(Qt.ItemDataRole.UserRole)))
+
+
         
                               
 
@@ -229,7 +262,7 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         
         self.project = project
 
-        self.setWindowTitle(project.getName())
+        self.setWindowTitle("PythonCBAS: " + project.getName())
 
         self.setUpMenuBar()
 
@@ -243,7 +276,9 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.NavigatorPage.layout().addWidget(self.navigator)
 
         # Set size
-        self.resize(960, 720)
+        self.resize(1010, 750)
+        # Center on screen
+        self.move(QApplication.primaryScreen().geometry().center() - self.frameGeometry().center())
         # self.showFullScreen()
         
         self.mainStack.setCurrentIndex(2)
@@ -275,6 +310,7 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.actionFile_Viewer.triggered.connect(lambda: self.mainStack.setCurrentIndex(1))
         self.actionImport_Data_Dialog.triggered.connect(self.importData)
         self.actionCard.triggered.connect(self.showExampleCard)
+        
 
     def runCBAS(self):
         startCBASTerminal()
@@ -286,6 +322,9 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--contingencies", help="List of contingencies to include in the resampling, comma-separated", type=str, default="all")
     args = parser.parse_args()
 
+    # Set current working directory to this file
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
     if args.sequence:
         if args.sequence:
             startCBASTerminal(args.num_samples)
@@ -294,6 +333,17 @@ if __name__ == "__main__":
         app = QApplication(sys.argv)
 
         # Load App Configurations
+        appdatafolder = os.path.join("AppData")
+        if not os.path.exists(appdatafolder):
+            os.mkdir(appdatafolder)
+
+        filepath = os.path.join(appdatafolder, "preferences.json")
+        preferences = Preferences(os.path.join(appdatafolder, "preferences.json"))
+        if not os.path.exists(filepath):
+            preferences.writePreferences()
+        else:
+            preferences.readPreferences(filepath)
+
 
 
         # Load ui/styles.qss
@@ -304,15 +354,17 @@ if __name__ == "__main__":
 
         qdarktheme.setup_theme("auto", additional_qss=qss)
 
-
+    
         
         
-        lobby = Lobby()
+        lobby = Lobby(preferences)
         project = lobby.run()
         if project is not None:
             mainWindow = PythonCBAS(project)
             mainWindow.show()
         else:
             sys.exit()
-
+        
         sys.exit(app.exec())
+
+        
