@@ -17,7 +17,7 @@ from random import randint
 
 from files import FileManager, CBASFile
 from settings import Settings, CONSTANTS
-from utils import HexUtils, FileUtils
+from utils import FileUtils
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -161,18 +161,22 @@ class SequenceManager:
         
 
 class SequencesProcessor(QThread):
-    start_scan_signal = pyqtSignal()
-    scan_progress_signal = pyqtSignal(tuple)
-    finished_signal = pyqtSignal()
-    scan_complete_signal = pyqtSignal(list)
-    def __init__(self, dataset_dir, anDataColumnNames: dict, language: dict, criterion: dict, counts_language: dict, num_animals: int):
+    start_processing_signal = pyqtSignal()
+    processing_progress_signal = pyqtSignal(tuple)
+    file_progress_signal = pyqtSignal(tuple)
+    scan_complete_signal = pyqtSignal()
+    processing_complete_signal = pyqtSignal()
+    seq_cnts_complete_signal = pyqtSignal()
+    def __init__(self, name, dataset_dir, anDataColumnNames: dict, language: dict, criterion: dict, counts_language: dict, num_animals: int):
         super(SequencesProcessor, self).__init__()
 
         # Import Settings
         # self.FILES = settings.getFiles()
         self.dataset_dir = dataset_dir
-        self.counts_dir = os.path.join(self.dataset_dir, 'Counts')
-        self.setupFiles()
+        self.counts_dir = None
+        if name is not None:
+            self.counts_dir = os.path.join(self.dataset_dir, name)
+            self.setupFiles()
         self.COLUMNS = anDataColumnNames
         self.LANGUAGE = {**language, **counts_language}
         self.CRITERION = criterion
@@ -423,20 +427,21 @@ class SequencesProcessor(QThread):
         all_paths = FileUtils.unpickleObj(os.path.join(self.dataset_dir, 'all_paths.pkl'))
         self.total_animals = len(all_paths)
         self.criterion_matrix = [[(0, 0) for _ in np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])] for _ in np.arange(self.total_animals)]
-        self.start_scan_signal.emit()
+        self.start_processing_signal.emit()
         for animal_num, animal in enumerate(all_paths):
             cohort_and_animal = animal.split(os.sep)[-2:]
-            self.scan_progress_signal.emit((animal_num, f'{cohort_and_animal[0]}/{cohort_and_animal[1]}'))
+            self.processing_progress_signal.emit((animal_num, f'Processing subject: {cohort_and_animal[0]}/{cohort_and_animal[1]}'))
             self.current_animal_num = animal_num
             mat = self.getMatrix(animal)
             mat = self.collapseModifiers(mat)
             mats_by_cont = self.splitContingency(mat)
             self.getAllLengthSequences(mats_by_cont, scanCriterion=scanCriterion)
             self.postProcessCriterionMatrixCurrAnimalRow(use_num_accomplished=scanCriterion)
+        self.processing_complete_signal.emit()
 
         
         # Trim the sequence counts matrices
-        lengths = [self.CRITERION['ORDER']] if scanCriterion else np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])
+        lengths = [self.CRITERION['ORDER'] - 1] if scanCriterion else np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH'])
         for length in lengths:
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
                 self.sequence_matrix[length][cont].trimSeqCnts()
@@ -453,6 +458,9 @@ class SequencesProcessor(QThread):
     def getCriterionMatrix(self):
         """Returns the criterion matrix."""
         return self.criterion_matrix
+
+    def getCountsDir(self):
+        return self.counts_dir
     
     def scanCriterionOrder(self):
         """
@@ -461,8 +469,15 @@ class SequencesProcessor(QThread):
         self.processAllAnimals(scanCriterion=True)
         criterion_matrix = self.getCriterionMatrix()
         # FileUtils.writeMatrix(os.path.join(self.counts_dir, 'criterionMatrix_scan.txt'), criterion_matrix)
-        print(type(criterion_matrix))
-        self.scan_complete_signal.emit(criterion_matrix)
+        self.scan_complete_signal.emit()
+
+    def runSequenceCounts(self):
+        """
+        Runs the sequence counts for all animals.
+        """
+        self.processAllAnimals()
+        self.generateSequenceFiles()
+        self.seq_cnts_complete_signal.emit()
 
 
     def generateSequenceFiles(self):
@@ -472,10 +487,13 @@ class SequencesProcessor(QThread):
         Also generates the criterionMatrix file.
         """
         counts_folders = Settings.getCountsFolderPaths(self.counts_dir)
+        i = self.num_animals  # Start at the number of animals since the progress continues from here (for the progress bar)
         for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
             for cont in np.arange(self.LANGUAGE['NUM_CONTINGENCIES']):
+                i += 1
+                self.processing_progress_signal.emit((i, f'Generating files for length {length+1} and contingency {cont}'))
                 self.sequence_matrix[length][cont].genAllSeqFile(counts_folders['ALLSEQDIR'], cont, length+1)
-                self.sequence_matrix[length][cont].genAllSeqAllAnFile(counts_folders['AllSEQALLANDIR'], cont, length+1)
+                self.sequence_matrix[length][cont].genAllSeqAllAnFile(counts_folders['ALLSEQALLANDIR'], cont, length+1)
                 self.sequence_matrix[length][cont].genSeqCntsFile(counts_folders['SEQCNTSDIR'], cont, length+1)
         
         # Write the criterion matrix to a file

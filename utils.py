@@ -5,7 +5,18 @@ import uuid
 import pickle
 import json
 import gzip
+import datetime
 from scipy.sparse import csr_matrix
+
+class ReturnContainer:
+    def __init__(self, value=None):
+        self.value = value
+
+    def set(self, value):
+        self.value = value
+
+    def get(self):
+        return self.value
 
 class HexUtils:
 
@@ -171,3 +182,18 @@ class ListUtils:
         """Returns a dictionary of the number of occurrences of each unique element in a list, sorted by the element."""
         return {k: v for k, v in sorted(ListUtils.countAll(l).items())}
     
+class TimeUtils:
+    def format_time(seconds):
+        duration = datetime.timedelta(seconds=seconds)
+        if duration < datetime.timedelta(milliseconds=1):
+            return "{:.2f} microseconds".format(duration.microseconds)
+        elif duration < datetime.timedelta(seconds=1):
+            return "{:.2f} milliseconds".format(duration.microseconds / 1000)
+        elif duration < datetime.timedelta(minutes=1):
+            return "{:.2f} seconds".format(duration.total_seconds())
+        elif duration < datetime.timedelta(hours=1):
+            return "{:.2f} minutes".format(duration.total_seconds() / 60)
+        elif duration < datetime.timedelta(days=1):
+            return "{:.2f} hours".format(duration.total_seconds() / 3600)
+        else:
+            return "{:.2f} days".format(duration.total_seconds() / 86400)

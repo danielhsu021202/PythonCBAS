@@ -212,9 +212,9 @@ class Lobby(QDialog, Ui_Lobby):
         project = Project()
         datecreated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         project.createProject(self.projectNameField.text(), self.descriptionTextEdit.toPlainText(), 
-                              datecreated, self.projectLocationField.text(), "beta")
+                              datecreated, os.path.join(self.projectLocationField.text()), "beta")
         project.writeProject()
-        self.preferences.addRecentlyOpened(filepath)
+        self.preferences.addRecentlyOpened(project.getFilepath())
         self.returnValue = project
         self.close()
 
@@ -222,7 +222,7 @@ class Lobby(QDialog, Ui_Lobby):
         """Load a project from a .json or .cbasproj file."""
         project = Project()
         project.readProject(filepath)
-        self.preferences.addRecentlyOpened(filepath)
+        self.preferences.addRecentlyOpened(project.getFilepath())
         self.returnValue = project
         self.close()
 
@@ -230,12 +230,13 @@ class Lobby(QDialog, Ui_Lobby):
         self.recentlyOpenedTable.clear()
 
         # Initialize first column size
-        self.recentlyOpenedTable.setColumnWidth(0, 200)
+        self.recentlyOpenedTable.setColumnWidth(0, 190)
 
         # Set headers
         self.recentlyOpenedTable.setHorizontalHeaderLabels(["Project", "Last Modified"])
 
-        recently_opened = self.preferences.getRecentlyOpened()
+        recently_opened = list(self.preferences.getRecentlyOpened())
+        recently_opened.sort(key=lambda x: os.path.getmtime(x), reverse=True)
         for i, filepath in enumerate(recently_opened):
             self.recentlyOpenedTable.insertRow(i)
             project = Project()

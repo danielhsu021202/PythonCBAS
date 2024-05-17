@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>415</width>
-    <height>653</height>
+    <height>601</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -74,30 +74,16 @@
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_3">
           <item>
-           <layout class="QFormLayout" name="formLayout_3">
-            <item row="0" column="0">
+           <layout class="QHBoxLayout" name="horizontalLayout">
+            <item>
              <widget class="QLabel" name="label">
               <property name="text">
                <string>Order:</string>
               </property>
              </widget>
             </item>
-            <item row="0" column="1">
+            <item>
              <widget class="QLineEdit" name="criterionOrderLineEdit">
-              <property name="placeholderText">
-               <string>(integer)</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="label_3">
-              <property name="text">
-               <string>Max Sequence Length:</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QLineEdit" name="maxSeqLenLineEdit">
               <property name="placeholderText">
                <string>(integer)</string>
               </property>
@@ -130,22 +116,6 @@
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout">
-            <item>
-             <widget class="QLabel" name="maxLabel">
-              <property name="font">
-               <font>
-                <bold>true</bold>
-               </font>
-              </property>
-              <property name="text">
-               <string>TextLabel</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
            <layout class="QHBoxLayout" name="horizontalLayout_3">
             <item>
              <widget class="QLabel" name="label_2">
@@ -161,13 +131,6 @@
               </property>
              </widget>
             </item>
-            <item>
-             <widget class="QPushButton" name="useNumberButton">
-              <property name="text">
-               <string>Use Max Trials</string>
-              </property>
-             </widget>
-            </item>
            </layout>
           </item>
          </layout>
@@ -179,6 +142,24 @@
           <string>Sequence Settings</string>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_4">
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <item>
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>Max Sequence Length:</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="maxSeqLenLineEdit">
+              <property name="placeholderText">
+               <string>(integer)</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
           <item>
            <widget class="QCheckBox" name="criterionIncludeFailedCheck">
             <property name="enabled">
@@ -230,19 +211,6 @@
           </size>
          </property>
         </spacer>
-       </item>
-       <item>
-        <widget class="QPushButton" name="runButton">
-         <property name="minimumSize">
-          <size>
-           <width>100</width>
-           <height>0</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>Run Now</string>
-         </property>
-        </widget>
        </item>
       </layout>
      </widget>
@@ -311,7 +279,7 @@
         </size>
        </property>
        <property name="text">
-        <string>Create</string>
+        <string>Run</string>
        </property>
       </widget>
      </item>

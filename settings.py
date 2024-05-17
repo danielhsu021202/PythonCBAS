@@ -118,10 +118,10 @@ class Settings:
     def getAnInfoCol(self, col_name):
         return self.animal_info_format[col_name]
     
-    def buildLanguageDict(num_choices, num_modifiers, num_contingencies):
+    def buildLanguageDict(num_choices, has_modifier, num_contingencies):
         return {
             'NUM_CHOICES': num_choices,
-            'NUM_MODIFIERS': num_modifiers,
+            'HAS_MODIFIER': has_modifier,
             'NUM_CONTINGENCIES': num_contingencies,
         }
     
@@ -351,16 +351,14 @@ class Counts:
         counts = {
             "type": "counts",
             "counts_settings": self.getCountsSettings(),
-            "criterion": self.getCriterion(),
-            "max_seq_len": self.getMaxSequenceLength(),
-            "straddle_sessions": self.straddleSessions(),
             "resamples": [resample.exportResamples() for resample in self.resamples]
         }
         return counts
 
-    def createCounts(self, name: str, description: str, criterion_dict: dict, counts_language_dict: dict):
+    def createCounts(self, name: str, dir, description: str, criterion_dict: dict, counts_language_dict: dict):
         self.counts_settings = {
             "name": name,
+            "dir": dir,
             "description": description,
             "criterion": criterion_dict,
             "counts_language": counts_language_dict,
@@ -378,6 +376,7 @@ class Counts:
     def getCardInfo(self): return (self.getName(), self.getDescription())
     def getCountsSettings(self) -> dict: return self.counts_settings
     def getName(self) -> str: return self.counts_settings["name"]
+    def getDir(self) -> str: return self.counts_settings["dir"]
     def getDescription(self) -> str: return self.counts_settings["description"]
     def getCriterion(self) -> dict: return self.counts_settings["criterion"]
     def getOrder(self) -> list: return self.getCriterion()["ORDER"]

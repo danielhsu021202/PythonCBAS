@@ -90,6 +90,15 @@ class Navigator(QWidget, Ui_NavigatorFrame):
             self.obj.writeProject()
             self.populateItems(self.obj, "counts")
 
+    def addResamples(self):
+        assert type(self.obj) == Counts
+        resamplesSettings = SettingsDialog("resamples", proj_obj=self.proj_obj, parent_obj=self.obj)
+        resamples = resamplesSettings.run()
+        if resamples is not None:
+            self.obj.addResamples(resamples)
+            self.obj.writeProject()
+            self.populateItems(self.obj, "resamples")
+
 
 
     

@@ -4,8 +4,100 @@ from settings import Settings, Project, DataSet, Counts
 
 from sequences import SequencesProcessor
 
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox
-from PyQt6.QtCore import Qt, QThread
+from utils import TimeUtils, ReturnContainer
+
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QLabel, QProgressBar, QVBoxLayout
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt6 import QtGui
+
+import time
+
+class ProgressDialog(QDialog):
+    def __init__(self, title: str, progress_max: int, 
+                 worker: QThread, worker_function, retrieval_function, 
+                 start_signal: pyqtSignal, running_signal: pyqtSignal, end_signal: pyqtSignal, 
+                 parent=None):
+        super(ProgressDialog, self).__init__(parent)
+
+        self.progress_max = progress_max
+        self.returnValue = None
+        self.worker = worker
+        self.display_percent = False
+        
+        # UI Setup
+        self.resize(300, 150)
+
+        self.setWindowTitle(title)
+        self.progressLabel = QLabel()
+        self.progressBar = QProgressBar()
+        self.timeElapsed = QLabel()
+
+        self.timeElapsed.setText("Time elapsed: 0.00 seconds")
+
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.progressLabel)
+        self.layout.addWidget(self.progressBar)
+        self.layout.addWidget(self.timeElapsed)
+
+        self.setLayout(self.layout)
+        self.running_thread = QThread()
+        self.worker.moveToThread(self.running_thread)
+        self.running_thread.started.connect(worker_function)
+        end_signal.connect(self.running_thread.quit)
+        self.running_thread.finished.connect(self.running_thread.deleteLater)
+        start_signal.connect(self.start)
+        running_signal.connect(self.updateProgress)
+
+        
+
+        self.running_thread.finished.connect(lambda: self.end(retrieval_function()))
+
+        # Timer setup
+        self.timer = QTimer()
+        self.startTime = None
+        self.timer.timeout.connect(self.updateTimeElapsed)
+        self.timer.start(1000)  # Update every second
+
+    def displayPercentage(self):
+        self.display_percent = True
+
+    def displayProportion(self):
+        self.display_percent = False
+
+    def start(self):
+        self.progressBar.setValue(0)
+        self.startTime = time.time()  # Record the start time
+
+    def updateProgress(self, progress: tuple):
+
+        # progress is (value, name) pair
+        value, progress_label = progress
+        percentage = value / self.progress_max * 100
+        self.progressBar.setValue(int(percentage))
+        if self.display_percent:
+            self.progressLabel.setText(f"{percentage:.2f}%")
+        else:
+            self.progressBar.setFormat(f"{value} / {self.progress_max}")
+        self.progressLabel.setText(progress_label)
+
+    def updateTimeElapsed(self):
+        if self.startTime is not None:
+            elapsed_time = time.time() - self.startTime
+            self.timeElapsed.setText(f"Time elapsed: {TimeUtils.format_time(elapsed_time)}")
+
+    def end(self, return_value):
+        self.timer.stop()  # Stop the timer when the operation is finished
+        self.returnValue = return_value
+        self.close()
+
+    def run(self):
+        self.running_thread.start()
+        self.exec()
+        return self.returnValue
+
+
+
+
 
 class SettingsDialog(QDialog, Ui_SettingsDialog):
     def __init__(self, setting_type: str, proj_obj: Project, parent_obj=None):
@@ -19,6 +111,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         if self.type == "counts":
             assert type(self.parent_obj) == DataSet
             self.setupCountsSettings()
+        elif self.type == "resamples":
+            assert type(self.parent_obj) == Counts
+            self.setupResampleSettings()
             
         self.returnValue = None
 
@@ -30,16 +125,17 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.SettingsPages.setCurrentIndex(0)
         self.setWindowTitle("Counts Settings")
         self.progressBar.hide()
-        self.useNumberButton.hide()
         self.progressLabel.hide()
-        # self.minLabel.hide()
-        self.maxLabel.hide()
-        scanButtonControl = lambda: self.scanButton.setDisabled((self.criterionOrderLineEdit.text() == "") or (self.maxSeqLenLineEdit.text() == ""))
-        self.criterionOrderLineEdit.textChanged.connect(scanButtonControl)
-        self.maxSeqLenLineEdit.textChanged.connect(scanButtonControl)
-        self.scanButton.clicked.connect(self.scanCriterionOrder)
 
-        self.createButton.clicked.connect(self.createCounts)
+        self.criterionOrderLineEdit.textChanged.connect(lambda: self.scanButton.setDisabled(self.criterionOrderLineEdit.text() == ""))
+
+        self.scanButton.clicked.connect(self.scanCriterionOrder)
+        self.createButton.clicked.connect(self.runCounts)
+
+        if not self.parent_obj.getHasModifier():
+            self.criterionOrderLineEdit.setText(str(0))
+            self.criterionOrderLineEdit.setDisabled(True)
+            self.criterionOrderLineEdit.setToolTip("This dataset has no modifier, so only criterion order 0 can be used.")
 
     def scanCriterionOrder(self):
         """
@@ -47,72 +143,33 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         Scan the criterion order.
         """
         assert type(self.parent_obj) == DataSet
-        # self.minLabel.show()
-        
 
         order = int(self.criterionOrderLineEdit.text())
-        inf_criterion = Settings.buildCriterionDict(order, float('inf'), self.criterionIncludeFailedCheck.isChecked(), self.criterionAllowRedemptionCheck.isChecked())
-        counts_language = Settings.buildCountsLanguageDict(int(self.maxSeqLenLineEdit.text()), bool(self.straddleSessionsCheck.isChecked()))
 
-        self.running_thread = QThread()
-        processor = SequencesProcessor(self.parent_obj.getDir(), 
+        if order < 0:
+            QMessageBox.critical(self, "Input Error", "Criterion order must be non-negative.")
+            return
+
+        inf_criterion = Settings.buildCriterionDict(order, float('inf'), self.criterionIncludeFailedCheck.isChecked(), self.criterionAllowRedemptionCheck.isChecked())
+        counts_language = Settings.buildCountsLanguageDict(order, bool(self.straddleSessionsCheck.isChecked()))  # Can use order as the max sequence length
+
+        # self.running_thread = QThread()
+        processor = SequencesProcessor(None,  # Name is none because we're not saving this, just scanning.
+                                        self.parent_obj.getDir(), 
                                        self.parent_obj.getAnDataColumnNames(), 
                                        self.parent_obj.getLanguage(), 
                                        inf_criterion, 
                                        counts_language, 
                                        self.parent_obj.getNumAnimals())
-        processor.moveToThread(self.running_thread)
-        processor.start_scan_signal.connect(self.startScan)
-        self.running_thread.started.connect(processor.scanCriterionOrder)
-        self.running_thread.finished.connect(self.running_thread.deleteLater)
-
-        processor.scan_progress_signal.connect(self.updateScanProgress)
-        
-        processor.scan_complete_signal.connect(self.running_thread.quit)
-        processor.scan_complete_signal.connect(self.running_thread.deleteLater)
-        processor.scan_complete_signal.connect(self.scanComplete)
-        self.running_thread.start()
-
-        # max_trials = processor.scanCriterionOrder()
-        # self.maxLabel.setText(f"Max trials: {max_trials}")
-
-        self.maxLabel.show()
-        self.useNumberButton.show()
-        # self.useNumberButton.clicked.connect(lambda: self.criterionNumberLineEdit.setText(str(max_trials)))
+        criterion_matrix = ProgressDialog(f"Scanning Criterion Order {order}", self.parent_obj.getNumAnimals(),
+                                          processor, processor.scanCriterionOrder, processor.getCriterionMatrix,
+                                          processor.start_processing_signal, processor.processing_progress_signal, processor.scan_complete_signal, self).run()
     
-    def startScan(self):
-        self.progressBar.show()
-        self.progressLabel.show()
-        self.progressBar.setValue(0)
-    
-    def updateScanProgress(self, progress: tuple):
-        animal_num, name = progress
-        self.progressBar.setValue(int(animal_num / self.parent_obj.getNumAnimals() * 100))
-        self.progressBar.setFormat(f"{animal_num} / {self.parent_obj.getNumAnimals()}")
-        self.progressLabel.setText(f"Scanning subject: {name}")
-
-    def scanComplete(self, mat):
-        self.progressBar.hide()
-        self.progressLabel.hide()
-        self.maxLabel.show()
-        self.scanButton.setDisabled(True)
-        print(mat)
 
 
-
-
-    def runCounts(self, criterion, counts_language):
+    def runCounts(self):
         assert type(self.parent_obj) == DataSet
-        processor = SequencesProcessor(self.parent_obj.getDir(),
-                                        self.parent_obj.getAnDataColumnNames(),
-                                        self.parent_obj.getLanguage(),
-                                        criterion,
-                                        counts_language,
-                                        self.parent_obj.getNumAnimals())
-        
 
-    def createCounts(self):
-        """Create the Counts object and return it."""
         # Field Validation
         if self.nameLineEdit.text() == "":
             QMessageBox.critical(self, "Input Error", "Name not filled.")
@@ -139,11 +196,34 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
 
         # Create the Counts object
         number = float('inf') if self.criterionNumberLineEdit.text() == "inf" else int(self.criterionNumberLineEdit.text())
-        criterion = Settings.buildCriterionDict(int(self.criterionOrderLineEdit.text()), number, self.criterionIncludeFailedCheck.isChecked(), self.criterionAllowRedemptionCheck.isChecked())
-        counts_language = Settings.buildCountsLanguageDict(int(self.maxSeqLenLineEdit.text()), bool(self.straddleSessionsCheck.isChecked()))
+        order = int(self.criterionOrderLineEdit.text())
+        max_seq_len = int(self.maxSeqLenLineEdit.text())
+        criterion = Settings.buildCriterionDict(order, number, self.criterionIncludeFailedCheck.isChecked(), self.criterionAllowRedemptionCheck.isChecked())
+        counts_language = Settings.buildCountsLanguageDict(max_seq_len, bool(self.straddleSessionsCheck.isChecked()))
 
+        processor = SequencesProcessor(self.nameLineEdit.text(),
+                                        self.parent_obj.getDir(),
+                                        self.parent_obj.getAnDataColumnNames(),
+                                        self.parent_obj.getLanguage(),
+                                        criterion,
+                                        counts_language,
+                                        self.parent_obj.getNumAnimals())
+        
+        total = self.parent_obj.getNumAnimals() + self.parent_obj.getNumContingencies() * max_seq_len
+        progress_dialog = ProgressDialog(f"Calculating Sequence Counts", total,
+                                            processor, processor.runSequenceCounts, processor.getCountsDir,
+                                            processor.start_processing_signal, processor.processing_progress_signal, processor.seq_cnts_complete_signal, self)
+        progress_dialog.displayPercentage()
+        counts_dir = progress_dialog.run()
+
+        self.createCounts(counts_dir, criterion, counts_language)
+        
+        
+    def createCounts(self, counts_dir, criterion, counts_language):
+        """Create the Counts object and return it."""
         counts = Counts()
         counts.createCounts(self.nameLineEdit.text(),
+                            counts_dir,
                             self.descPlainTextEdit.toPlainText(),
                             criterion,
                             counts_language)
