@@ -7,9 +7,10 @@ import datetime
 next_type = {
     "project": "dataset",
     "dataset": "counts",
-    "counts": "resample",
-    "resample": "pvalues",
-    "pvalues": "visualizations",
+    "counts": "resamples",
+    # "resamples": "pvalues",
+    # "pvalues": "visualizations",
+    "resamples": "visualizations",
     "visualizations": None
 }
 
@@ -17,14 +18,15 @@ prev_type = {
     "project": None,
     "dataset": "project",
     "counts": "dataset",
-    "resample": "counts",
-    "pvalues": "resample",
-    "visualizations": "pvalues"
+    "resamples": "counts",
+    # "pvalues": "resamples",
+    # "visualizations": "pvalues"
+    "visualizations": "resamples"
 }
 
 CONSTANTS = {
-    "NaN": -1,
-    "inf": -2
+    "NaN": None,
+    "inf": float("inf"),
 }
 
 
@@ -34,74 +36,7 @@ class Settings:
     Repurposed into a class that handles globals and common names across the algorithm.
     """
     def __init__(self):
-        self.language = {
-            'NUM_CHOICES': 6,
-            'STRADDLE_SESSIONS': False,
-            'NUM_MODIFIERS': 1,
-            'MODIFIER_RANGES': [6],
-            'MAX_SEQUENCE_LENGTH': 6,
-            'NUM_CONTINGENCIES': 7,
-        }
-
-        self.criterion = {
-            'ORDER': 0,
-            'NUMBER': float('inf'),
-            'INCLUDE_FAILED': True,  # Special case: If subject does not get to the criterion (e.g., want 200th trial but subject only completes 30)
-            'ALLOW_REDEMPTION': True,  # Do we exclude for every (subsequent) contingency (False), 
-                                        # or do we exclude it until it reaches the criterion again (True)?
-        }
-
-        self.files = {
-            'DATA': 'Data/scn2aDataSwapped/',
-            'OUTPUT': 'output_hex/',
-            'ALLSEQDIR': os.path.join('output_hex', 'All Seq'),
-            'ALLSEQALLANDIR': os.path.join('output_hex', 'All Seq All An'),
-            'SEQCNTSDIR': os.path.join('output_hex', 'Sequence Counts'),
-            'METADATA': 'metadata/',
-            'EXPECTED_OUTPUT': 'expected_output_scn2a/',
-            'COHORTS_FILE': os.path.join('metadata', 'cohorts.txt'),
-            'ANIMALS_FILE': os.path.join('metadata', 'animals.txt'),
-            'INFO_FILE': 'anInfo.txt',
-        }
-
-        self.animal_info_format = {
-            'ANKEY': 0,
-            'GENOTYPE': 1,
-            'SEX': 2,
-            'LESION': 3,
-            'IMPLANT': 4,
-        }
-        
-        self.animal_file_format = {
-            'SESSION_NO_COL': 0,
-            'CHOICE_COL': 1,
-            'CONTINGENCY_COL': 2,
-            'MODIFIER_COL': 3,
-        }
-
-        self.constants = {
-            'NaN': -1,
-            'inf': -2
-        }
-
-        # Catalogue for the possible values of each attribute, in numerical order (0, 1, 2, ...)
-        # For example, since while making the data, we set 0 to be male and 1 to be female, and it
-        # appears this way in anInfo.txt, we have under SEX, 'Male' in index 0, and 'Female' in index 1.
-        self.catalogue = {
-            'GENOTYPE': ['WT', 'scn2a heterozygous'],
-            'SEX': ['Male', 'Female'],
-            'LESION': ['Unlesioned', 'Hippocampus', 'DMS', 'DREADD'],
-            'IMPLANT': ['Unimplanted', 'Implanted']
-        }
-
-    def getLanguage(self):
-        return self.language
-
-    def getFiles(self):
-        return self.files
-
-    def getAnimalFileFormat(self):
-        return self.animal_file_format
+        pass
     
     def getAnimalInfoFormat(self):
         return self.animal_info_format
@@ -203,7 +138,7 @@ class Project:
     
     def writeProject(self):
         filename = self.getName() + ".json" #TODO: Change this to .cbasproj extension
-        filepath = os.path.join(self.getProjectDir(), filename)
+        filepath = os.path.join(self.getDir(), filename)
         self.setDateModified(str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         with open(filepath, 'w') as f:
             json.dump(self.exportProject(), f)
@@ -229,15 +164,19 @@ class Project:
 
     def retracePath(self):
         return [self]
+    
+    def deleteChild(self, child):
+        self.datasets.remove(child)
+        FileUtils.deleteFolder(child.getDir())
 
     
     ### GETTER FUNCTIONS ###
-    def getType(self) -> str: "project"
+    def getType(self) -> str: return "project"
     def getProjectAttr(self) -> dict: return self.project_attr
-    def getFilepath(self) -> str: return os.path.join(self.getProjectDir(), self.getName() + ".json")
+    def getFilepath(self) -> str: return os.path.join(self.getDir(), self.getName() + ".json")
     def getName(self) -> str: return self.project_attr["name"]
     def getDescription(self) -> str: return self.project_attr["description"]
-    def getProjectDir(self) -> str: return self.project_attr["dir"]
+    def getDir(self) -> str: return self.project_attr["dir"]
     def getProjectVersion(self) -> str: return self.project_attr["version"]
     def getProjectDateCreated(self) -> str: return self.project_attr["datecreated"]
     def getProjectDateModified(self) -> str: return self.project_attr["datemodified"]
@@ -278,19 +217,23 @@ class DataSet:
         }
         return dataset
     
-    def createDataset(self, name, description, dir, aninfoname, anInfoColumnNames, anDataColumnNames, correlational_possible, num_choices, hasModifier, num_contingencies, num_animals):
-        anInfoColumnsDict = {name: index for index, name in enumerate(anInfoColumnNames)}
-        #TODO: AN DATA COL NAMES
+    def createDataset(self, name, description, dir, 
+                      aninfoname, anInfoColumnNames, anDataColumns, 
+                      correlational_possible, num_choices, hasModifier, num_contingencies, num_animals,
+                      cohort_file, all_animals_file, all_paths_file):
         self.dataset_settings = {
             "name": name,
             "description": description,
             "dir": dir,
             "aninfoname": aninfoname,
             "anInfoColumnNames": anInfoColumnNames,
-            "anDataColumnNames": anDataColumnNames,
+            "anDataColumns": anDataColumns,
             "correlational_possible": correlational_possible,
             "language": Settings.buildLanguageDict(num_choices, hasModifier, num_contingencies),
             "num_animals": num_animals,
+            "cohort_file": cohort_file,
+            "all_animals_file": all_animals_file,
+            "all_paths_file": all_paths_file
         }
     
     def addCounts(self, counts_obj):
@@ -302,6 +245,10 @@ class DataSet:
 
     def retracePath(self):
         return self.getParent().retracePath() + [self]
+    
+    def deleteChild(self, child):
+        self.counts.remove(child)
+        FileUtils.deleteFolder(child.getDir())
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "dataset"
@@ -311,13 +258,16 @@ class DataSet:
     def getDir(self) -> str: return self.dataset_settings["dir"]
     def getAnInfoName(self) -> str: return self.dataset_settings["aninfoname"]
     def getAnInfoColumnNames(self) -> list: return self.dataset_settings["anInfoColumnNames"]
-    def getAnDataColumnNames(self) -> dict: return self.dataset_settings["anDataColumnNames"]
+    def getAnDataColumns(self) -> dict: return self.dataset_settings["anDataColumns"]
     def correlationalPossible(self) -> bool: return self.dataset_settings["correlational_possible"]
     def getNumAnimals(self) -> int: return self.dataset_settings["num_animals"]
     def getLanguage(self) -> dict: return self.dataset_settings["language"]
     def getNumChoices(self) -> int: return self.getLanguage()["NUM_CHOICES"]
     def getHasModifier(self) -> int: return self.getLanguage()["HAS_MODIFIER"]
     def getNumContingencies(self) -> int: return self.getLanguage()["NUM_CONTINGENCIES"]
+    def getCohortFile(self) -> str: return self.dataset_settings["cohort_file"]
+    def getAllAnimalsFile(self) -> str: return self.dataset_settings["all_animals_file"]
+    def getAllPathsFile(self) -> str: return self.dataset_settings["all_paths_file"]
     def getChildren(self) -> list: return self.counts
     def getParent(self) -> Project: return self.parent
 
@@ -364,12 +314,20 @@ class Counts:
             "counts_language": counts_language_dict,
         }
     
-    def addResamplesObj(self, resample_obj):
+    def addResamples(self, resample_obj):
         resample_obj.setParent(self)
         self.resamples.append(resample_obj)
 
     def retracePath(self):
         return self.getParent().retracePath() + [self]
+    
+    def deleteChild(self, child):
+        self.resamples.remove(child)
+        FileUtils.deleteFolder(child.getDir())
+
+    def writeProject(self):
+        self.getParent().writeProject()
+
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "counts"
@@ -398,106 +356,133 @@ class Resamples:
     def __init__(self, ):
         self.pvalues = []
         self.resample_settings = None
+        self.pvaluesettings = None  # [PVALUE]
     
     def readResamples(self, resamples):
-        try:
-            pvalues = resamples["pvalues"]
-        except KeyError:
-            raise KeyError("Error reading in the resamples.")
+        # try:
+        #     pvalues = resamples["pvalues"]
+        # except KeyError:
+        #     raise KeyError("Error reading in the resamples.")
         
-        for pvalue in pvalues:
-            pvalue_obj = Pvalues()
-            pvalue_obj.readPvalues(pvalue)
-            pvalue_obj.setParent(self)
-            self.pvalues.append(pvalue_obj)
+        # for pvalue in pvalues:
+        #     pvalue_obj = Pvalues()
+        #     pvalue_obj.readPvalues(pvalue)
+        #     pvalue_obj.setParent(self)
+        #     self.pvalues.append(pvalue_obj)
         
         self.resample_settings = resamples["resample_settings"]
+        self.pvaluesettings = resamples["pvalue_settings"]  # [PVALUE]
 
     def exportResamples(self):
         """Generate the dictionary for a resamples object."""
         resamples = {
-            "type": "resample",
+            "type": "resamples",
             "resample_settings": self.getResampleSettings(),
-            "pvalues": [pvalue.exportPvalues() for pvalue in self.pvalues]
+            "pvalue_settings": self.getPValueSettings(),
+            # "pvalues": [pvalue.exportPvalues() for pvalue in self.pvalues]
         }
         return resamples
     
-    def createResample(self, name: str, seed, num_resamples: int, contingencies: list, groups: dict):
+    def createResamples(self, name: str, description: str, directory, correlational: bool, seed, num_resamples: int, contingencies: list, groups: dict,
+                       fdp: bool, alpha: float, gamma: float):
+        reformatted_groups = [[int(num) for num in group] for group in groups] if not correlational else None
         self.resample_settings = {
             "name": name,
+            "description": description,
+            "dir": directory,
+            "correlational": correlational,
             "seed": seed,
             "numresamples": num_resamples,
             "contingencies": contingencies,
-            "groups": groups
+            "groups": reformatted_groups
+        }
+        self.pvaluesettings = {
+            "fdp": fdp,
+            "alpha": alpha,
+            "gamma": gamma
         }
     
-    def addPvaluesObj(self, pvalue_obj):
-        pvalue_obj.setParent(self)
-        self.pvalues.append(pvalue_obj)
+    # def addPvaluesObj(self, pvalue_obj):
+    #     pvalue_obj.setParent(self)
+    #     self.pvalues.append(pvalue_obj)
+
+    def writeProject(self):
+        self.getParent().writeProject()
 
     def retracePath(self):
         return self.getParent().retracePath() + [self]
 
     ### GETTER FUNCTIONS ###
-    def getType(self) -> str: return "resample"
-    def getCardInfo(self): return (self.getName(), "")
+    def getType(self) -> str: return "resamples"
+    def getCardInfo(self): return (self.getName(), self.getDescription())
     def getResampleSettings(self) -> dict: return self.resample_settings
     def getName(self) -> str: return self.resample_settings["name"]
+    def getDescription(self) -> str: return self.resample_settings["description"]
+    def getDir(self) -> str: return self.resample_settings["dir"]
+    def isCorrelational(self) -> bool: return self.resample_settings["correlational"]
     def getSeed(self) -> int: return self.resample_settings["seed"]
     def getNumResamples(self) -> int: return self.resample_settings["numresamples"]
     def getContingencies(self) -> list: return self.resample_settings["contingencies"]
     def getGroups(self) -> dict: return self.resample_settings["groups"]
+    # P-Value Settings are here for now, since we're combining until we can figure out how to separate them
+    def getPValueSettings(self) -> dict: return self.pvaluesettings
+    def useFDP(self) -> bool: return self.pvaluesettings["fdp"]
+    def getAlpha(self) -> float: return self.pvaluesettings["alpha"]
+    def getGamma(self) -> float: return self.pvaluesettings["gamma"]
+    # End of P-Value Settings
     def getChildren(self) -> list: return self.pvalues
     def getParent(self) -> Counts: return self.parent
 
     ### SETTER FUNCTIONS ###
     def setParent(self, parent:Counts): self.parent = parent
+
+    
     
 
 
-class Pvalues:
-    def __init__(self, ):
-        self.visualizations = []
-        self.pvaluesettings = None
+# class Pvalues:
+#     def __init__(self, ):
+#         self.visualizations = []
+#         self.pvaluesettings = None
     
-    def readPvalues(self, pvalues):
-        try:
-            visualizations = pvalues["visualizations"]
-        except KeyError:
-            raise KeyError("Error reading in the pvalues.")
+#     def readPvalues(self, pvalues):
+#         try:
+#             visualizations = pvalues["visualizations"]
+#         except KeyError:
+#             raise KeyError("Error reading in the pvalues.")
         
-        for visualization in visualizations:
-            visualization_obj = Visualizations()
-            visualization_obj.readVisualizations(visualization)
+#         for visualization in visualizations:
+#             visualization_obj = Visualizations()
+#             visualization_obj.readVisualizations(visualization)
 
-            self.visualization_obj.setParent(self)
-            self.visualizations.append(visualization_obj)
+#             self.visualization_obj.setParent(self)
+#             self.visualizations.append(visualization_obj)
 
-    def exportPvalues(self):
-        """Generate the dictionary for a pvalues object."""
-        pvalues = {
-            "type": "pvalues",
-            "pvaluesettings": self.getPvaluesSettings(),
-            "visualizations": [visualization.exportVisualizations() for visualization in self.visualizations]
-        }
-        return pvalues
+#     def exportPvalues(self):
+#         """Generate the dictionary for a pvalues object."""
+#         pvalues = {
+#             "type": "pvalues",
+#             "pvaluesettings": self.getPvaluesSettings(),
+#             "visualizations": [visualization.exportVisualizations() for visualization in self.visualizations]
+#         }
+#         return pvalues
     
-    ### GETTER FUNCTIONS ###
-    def getType(self) -> str: return "pvalues"
-    def getPvaluesSettings(self) -> dict: return self.pvaluesettings
-    def useFDP(self) -> bool: return self.pvaluesettings["fdp"]
-    def getAlpha(self) -> float: return self.pvaluesettings["alpha"]
-    def getGamma(self) -> float: return self.pvaluesettings["gamma"]
-    def getChildren(self) -> list: return self.visualizations
-    def getParent(self) -> Resamples: return self.parent
+#     ### GETTER FUNCTIONS ###
+#     def getType(self) -> str: return "pvalues"
+#     def getPvaluesSettings(self) -> dict: return self.pvaluesettings
+#     def useFDP(self) -> bool: return self.pvaluesettings["fdp"]
+#     def getAlpha(self) -> float: return self.pvaluesettings["alpha"]
+#     def getGamma(self) -> float: return self.pvaluesettings["gamma"]
+#     def getChildren(self) -> list: return self.visualizations
+#     def getParent(self) -> Resamples: return self.parent
 
-    ### SETTER FUNCTIONS ###
-    def setParent(self, parent:Resamples): self.parent = parent
+#     ### SETTER FUNCTIONS ###
+#     def setParent(self, parent:Resamples): self.parent = parent
 
     
-    def addVisualizationsObj(self, visualization_obj):
-        visualization_obj.setParent(self)
-        self.visualizations.append(visualization_obj)
+#     def addVisualizationsObj(self, visualization_obj):
+#         visualization_obj.setParent(self)
+#         self.visualizations.append(visualization_obj)
 
 
 class Visualizations:

@@ -1,11 +1,13 @@
 import numpy as np
 import re
 import os
+import shutil
 import uuid
 import pickle
 import json
 import gzip
 import datetime
+import subprocess
 from scipy.sparse import csr_matrix
 
 class ReturnContainer:
@@ -125,6 +127,10 @@ class FileUtils:
         """Returns True if the file is not hidden (starts with '.')"""
         if os.path.isfile(filepath):
             return not os.path.basename(filepath).startswith('.')
+        
+    def deleteFolder(folder):
+        """Deletes a folder and all its contents."""
+        shutil.rmtree(folder)
 
             
 class MatrixUtils:
@@ -197,3 +203,17 @@ class TimeUtils:
             return "{:.2f} hours".format(duration.total_seconds() / 3600)
         else:
             return "{:.2f} days".format(duration.total_seconds() / 86400)
+
+class WebUtils:
+    def check_internet_connection():
+        try:
+            subprocess.check_output(["ping", "-c", "1", "www.google.com"])
+            return True
+        except subprocess.CalledProcessError:
+            return False
+        
+
+# Test WebUtils
+
+if __name__ == "__main__":
+    print(WebUtils.check_internet_connection())

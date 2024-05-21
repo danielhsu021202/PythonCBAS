@@ -9,13 +9,12 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 import re
 import csv
-from colorama import Fore
 import time
 
 
 from random import randint
 
-from files import FileManager, CBASFile
+from files import CBASFile
 from settings import Settings, CONSTANTS
 from utils import FileUtils
 
@@ -123,7 +122,7 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
-        cbas_file = CBASFile(f'allSeq_{cont}_{seq_len}', mat)
+        cbas_file = CBASFile(f'allSeq_{cont}_{seq_len}', mat, )
         cbas_file.saveFile(dir)
         # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
     
@@ -133,7 +132,7 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array(self.animal_trials)
-        cbas_file = CBASFile(f'allSeqAllAn_{cont}_{seq_len}', mat)
+        cbas_file = CBASFile(f'allSeqAllAn_{cont}_{seq_len}', mat, col_headers=['Subject No.', 'Trial No.', 'Seq No.'])
         cbas_file.saveFile(dir)
         # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
 
@@ -167,6 +166,7 @@ class SequencesProcessor(QThread):
     scan_complete_signal = pyqtSignal()
     processing_complete_signal = pyqtSignal()
     seq_cnts_complete_signal = pyqtSignal()
+    
     def __init__(self, name, dataset_dir, anDataColumnNames: dict, language: dict, criterion: dict, counts_language: dict, num_animals: int):
         super(SequencesProcessor, self).__init__()
 
@@ -477,6 +477,7 @@ class SequencesProcessor(QThread):
         """
         self.processAllAnimals()
         self.generateSequenceFiles()
+        self.buildSeqNumIndex
         self.seq_cnts_complete_signal.emit()
 
 
@@ -500,7 +501,7 @@ class SequencesProcessor(QThread):
         criterion_mat_file = CBASFile(f'criterionMatrix_{self.CRITERION["ORDER"]}_{self.CRITERION["NUMBER"]}', self.criterion_matrix)
         criterion_mat_file.saveFile(self.counts_dir, dtype=int)
         
-    def buildSeqNumIndex(self, all_seq_cnts, conts='all'):
+    def buildSeqNumIndex(all_seq_cnts, conts, max_seq_len, dir):
         """
         Builds a dictionary that maps sequence numbers to indices in the sequence counts matrix.
         Right now the sequence counts matrix is constructed as such:
@@ -537,37 +538,39 @@ class SequencesProcessor(QThread):
 
         To consider only a subset of contingencies, can pass in only the sequence counts with the desired contingencies.
         """
-        self.seq_num_index = {}
+        seq_num_index = {}
         last_idx = 0
-        if conts == 'all':
-            conts = np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])
-        for cont in conts:
-            for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
-                seq_cnts = all_seq_cnts[length][cont]
+        # if conts == 'all':
+        #     conts = np.arange(self.LANGUAGE['NUM_CONTINGENCIES'])
+        for i, cont in enumerate(conts):
+            for length in np.arange(max_seq_len):
+                seq_cnts = all_seq_cnts[length][i]  # Use i because Resampler's readSequenceCounts function returns only the desired contingencies
                 col_cnt = seq_cnts.shape[1]
-                self.seq_num_index[(last_idx, last_idx + col_cnt - 1)] = (cont, length+1)
+                seq_num_index[(last_idx, last_idx + col_cnt - 1)] = (cont, length+1)
                 last_idx += col_cnt
 
-        for (start, end), (cont, length) in self.seq_num_index.items():
-            print(f"({start}, {end}) -> ({cont}, {length})")
+        # for (start, end), (cont, length) in seq_num_index.items():
+        #     print(f"({start}, {end}) -> ({cont}, {length})")
+        FileUtils.pickleObj(seq_num_index, os.path.join(dir, 'seq_num_index.pkl'))
+        return seq_num_index
     
-    def locateSequenceNumber(self, universal_seq_num):
+    def locateSequenceNumber(universal_seq_num: int, seq_num_index: dict, ):
         """
         Given a universal sequence number, return the contingency-length pair that the sequence number belongs to,
         as well as which sequence number it is in that contingency-length pair.
         """
-        for (start, end), (cont, length) in self.seq_num_index.items():
+        for (start, end), (cont, length) in seq_num_index.items():
             if start <= universal_seq_num <= end:
                 return (cont, length, universal_seq_num - start)
         return None
     
-    def getSequence(self, index):
+    def getSequence(index: int, seq_num_index: dict, counts_dir):
         """
         Given the location info, return the sequence corresponding to that location.
         """
-        cont, length, seq_num = self.locateSequenceNumber(index)
+        cont, length, seq_num = SequencesProcessor.locateSequenceNumber(index, seq_num_index)
         # Look for the sequence in the file
-        all_seq_dir = Settings.getCountsFolderPaths(self.counts_dir)['ALLSEQDIR']
+        all_seq_dir = Settings.getCountsFolderPaths(counts_dir)['ALLSEQDIR']
         file = CBASFile.loadFile(os.path.join(all_seq_dir, f'allSeq_{cont}_{length}.cbas'))
         mat = file.data
         
@@ -588,7 +591,7 @@ class SequencesProcessor(QThread):
         for cont in conts:
             for length in np.arange(self.LANGUAGE['MAX_SEQUENCE_LENGTH']):
                 all_seq_cnts[length][cont] = self.sequence_matrix[length][cont].getSeqCounts()
-        self.buildSeqNumIndex(all_seq_cnts, conts)
+        # self.buildSeqNumIndex(all_seq_cnts, conts)
         return all_seq_cnts
 
 

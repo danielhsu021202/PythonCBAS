@@ -15,7 +15,7 @@ import os
 from PyQt6.QtWidgets import QMenu
 from PyQt6.QtCore import Qt
 
-from utils import ListUtils
+from utils import ListUtils, FileUtils
 from files import CBASFile
 
 class PandasTableModel(QAbstractTableModel): 
@@ -110,63 +110,65 @@ class PandasTable(QTableView):
         if self.sender() == self.horizontalHeader():
             filterAction = menu.addAction("Filter")
         action = menu.exec(self.mapToGlobal(pos))
-
-        if action == sortAscendingAction:
-            if self.sender() == self.horizontalHeader():
-                self.sortColumn(self.columnAt(pos.x()), True)
-            else:
-                self.sortRow(self.rowAt(pos.y()), True)
-        elif action == sortDescendingAction:
-            if self.sender() == self.horizontalHeader():
-                self.sortColumn(self.columnAt(pos.x()), False)
-            else:
-                self.sortRow(self.rowAt(pos.y()), False)
-        elif action == sumAction:
-            if self.sender() == self.horizontalHeader():
-                col = self.columnAt(pos.x())
-                self.writeToFuncTerminal(f"Sum of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].sum())}")
-            else:
-                row = self.rowAt(pos.y())
-                self.writeToFuncTerminal(f"Sum of row {row}: {str(self.df.iloc[row].sum())}")
-        elif action == averageAction:
-            if self.sender() == self.horizontalHeader():
-                col = self.columnAt(pos.x())
-                self.writeToFuncTerminal(f"Average of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].mean())}")
-            else:
-                row = self.rowAt(pos.y())
-                self.writeToFuncTerminal(f"Average of row {row}: {str(self.df.iloc[row].mean())}")
-        elif action == medianAction:
-            if self.sender() == self.horizontalHeader():
-                col = self.columnAt(pos.x())
-                selected_column = list(self.df[self.df.columns[col]])
-                median_value = median(selected_column)
-                self.writeToFuncTerminal(f"Median of column {self.df.columns[col]}: {str(median_value)}")
-            else:
-                row = self.rowAt(pos.y())
-                selected_row = list(self.df.iloc[row])
-                median_value = median(selected_row)
-                self.writeToFuncTerminal(f"Median of row {row}: {str(median_value)}")
-        elif action == modeAction:
-            if self.sender() == self.horizontalHeader():
-                col = self.columnAt(pos.x())
-                selected_column = list(self.df[self.df.columns[col]])
-                mode_value = mode(selected_column)
-                self.writeToFuncTerminal(f"Mode of column {self.df.columns[col]}: {str(mode_value)}")
-            else:
-                row = self.rowAt(pos.y())
-                selected_row = list(self.df.iloc[row])
-                mode_value = mode(selected_row)
-                self.writeToFuncTerminal(f"Mode of row {row}: {str(mode_value)}")
-        elif action == rangeAction:
-            if self.sender() == self.horizontalHeader():
-                col = self.columnAt(pos.x())
-                self.writeToFuncTerminal(f"Range of column {self.df.columns[col]}: [{str(self.df[self.df.columns[col]].min())}, {str(self.df[self.df.columns[col]].max())}]")
-            else:
-                row = self.rowAt(pos.y())
-                self.writeToFuncTerminal(f"Range of row {row}: [{str(self.df.iloc[row].min())}, {str(self.df.iloc[row].max())}]")
-        elif action == filterAction:
-            # Summon the filter dialog, passing in the name of the column being called
-            self.parent.addStage(col=self.df.columns[self.columnAt(pos.x())])
+        try:
+            if action == sortAscendingAction:
+                if self.sender() == self.horizontalHeader():
+                    self.sortColumn(self.columnAt(pos.x()), True)
+                else:
+                    self.sortRow(self.rowAt(pos.y()), True)
+            elif action == sortDescendingAction:
+                if self.sender() == self.horizontalHeader():
+                    self.sortColumn(self.columnAt(pos.x()), False)
+                else:
+                    self.sortRow(self.rowAt(pos.y()), False)
+            elif action == sumAction:
+                if self.sender() == self.horizontalHeader():
+                    col = self.columnAt(pos.x())
+                    self.writeToFuncTerminal(f"Sum of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].sum())}")
+                else:
+                    row = self.rowAt(pos.y())
+                    self.writeToFuncTerminal(f"Sum of row {row}: {str(self.df.iloc[row].sum())}")
+            elif action == averageAction:
+                if self.sender() == self.horizontalHeader():
+                    col = self.columnAt(pos.x())
+                    self.writeToFuncTerminal(f"Average of column {self.df.columns[col]}: {str(self.df[self.df.columns[col]].mean())}")
+                else:
+                    row = self.rowAt(pos.y())
+                    self.writeToFuncTerminal(f"Average of row {row}: {str(self.df.iloc[row].mean())}")
+            elif action == medianAction:
+                if self.sender() == self.horizontalHeader():
+                    col = self.columnAt(pos.x())
+                    selected_column = list(self.df[self.df.columns[col]])
+                    median_value = median(selected_column)
+                    self.writeToFuncTerminal(f"Median of column {self.df.columns[col]}: {str(median_value)}")
+                else:
+                    row = self.rowAt(pos.y())
+                    selected_row = list(self.df.iloc[row])
+                    median_value = median(selected_row)
+                    self.writeToFuncTerminal(f"Median of row {row}: {str(median_value)}")
+            elif action == modeAction:
+                if self.sender() == self.horizontalHeader():
+                    col = self.columnAt(pos.x())
+                    selected_column = list(self.df[self.df.columns[col]])
+                    mode_value = mode(selected_column)
+                    self.writeToFuncTerminal(f"Mode of column {self.df.columns[col]}: {str(mode_value)}")
+                else:
+                    row = self.rowAt(pos.y())
+                    selected_row = list(self.df.iloc[row])
+                    mode_value = mode(selected_row)
+                    self.writeToFuncTerminal(f"Mode of row {row}: {str(mode_value)}")
+            elif action == rangeAction:
+                if self.sender() == self.horizontalHeader():
+                    col = self.columnAt(pos.x())
+                    self.writeToFuncTerminal(f"Range of column {self.df.columns[col]}: [{str(self.df[self.df.columns[col]].min())}, {str(self.df[self.df.columns[col]].max())}]")
+                else:
+                    row = self.rowAt(pos.y())
+                    self.writeToFuncTerminal(f"Range of row {row}: [{str(self.df.iloc[row].min())}, {str(self.df.iloc[row].max())}]")
+            elif action == filterAction:
+                # Summon the filter dialog, passing in the name of the column being called
+                self.parent.addStage(col=self.df.columns[self.columnAt(pos.x())])
+        except Exception:
+            self.writeToFuncTerminal(f"Function not available for this column/row.")
 
     def getDF(self):
         return self.df
@@ -203,8 +205,6 @@ class PandasTable(QTableView):
     def countNaN(self):
         """Counts the number of NaN values in the table."""
         self.parent.functionTerminal.appendPlainText("NaNs: " + str(self.df.isnull().sum().sum()))
-
-
     
     def updateTable(self, df=None):
         if df is not None:
@@ -220,12 +220,12 @@ class FileViewer(QWidget, Ui_FileViewer):
 
     supported_file_types = ['.cbas', '.txt', '.csv', '.pkl', '.npy']
 
-    def __init__(self, parent=None):
+    def __init__(self, directory, parent=None):
         super(FileViewer, self).__init__(parent)
         self.setupUi(self)
         self.setDefaultSizes()
 
-        self.directories = set([os.path.join("output"), os.path.join("metadata")])
+        self.directories = set([directory])
         self.open_files = set()
 
         self.refreshFileTree()
@@ -239,6 +239,7 @@ class FileViewer(QWidget, Ui_FileViewer):
 
 
     def mapButtonActions(self):
+        """Maps the buttons to their actions."""
         self.fileTreeImportButton.clicked.connect(self.importDirectory)
         self.refreshFileTreeButton.clicked.connect(self.refreshFileTree)
         self.countRowsButton.clicked.connect(lambda: self.tableAction("count_rows"))
@@ -250,6 +251,21 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.applyFiltersButton.clicked.connect(self.applyFilters)
         self.clearPipelineButton.clicked.connect(lambda: self.filterTable.setRowCount(0))
         self.fileTabs.tabCloseRequested.connect(self.closeFile)
+        self.exportButton.clicked.connect(self.exportFile)
+        # enable the export button only if file is .cbas
+        self.fileTabs.currentChanged.connect(self.updateExportButtonState)
+
+    def updateExportButtonState(self):
+        if self.currentFile() is not None:
+            self.exportButton.setEnabled(self.currentFile().endswith(".cbas"))
+
+    def exportFile(self):
+        # Filter for either .csv or .txt
+        filepath = QFileDialog.getSaveFileName(self, "Export File", filter="Comma Separated Values (*.csv);;Text File (*.txt)")[0]
+        if filepath:
+            cbas_f = CBASFile.loadFile(self.currentFile())
+            cbas_f.export(filepath, "csv" if filepath.endswith(".csv") else "txt")
+            self.functionTerminal.appendPlainText(f"Exported {os.path.basename(filepath)} to {os.path.dirname(filepath)}")
 
     def setupFilterTable(self):
         # Context menu when a filter table row is right clicked
@@ -284,7 +300,6 @@ class FileViewer(QWidget, Ui_FileViewer):
             elif action == editAction:
                 pass
 
-        
 
     def importDirectory(self):
         """Opens a file dialog to import a directory."""
@@ -333,22 +348,27 @@ class FileViewer(QWidget, Ui_FileViewer):
         elif filename.startswith("seqRates"):
             return "seqRates"
         
-    def getColumnNames(self, filepath, df):
-        """Returns the column names of the file at the given path."""
-        filetype = self.fileType(filepath)
-        if filetype == "animals":
-            return ["Animal Number", "Cohort Number", "Animal Key", "Genotype", "Sex", "Lesion", "Implant"]
-        elif filetype == "allSeqAllAn":
-            return ["Animal Number", "Trial Number", "Sequence Number"]
-        elif filetype == "seqRates":
-            return ["Original Seq No.", "Group 1 Mean", "Group 1 Var", "N1", "Group 2 Mean", "Group 2 Var", "N2", "Cont", "Len", "STS 1", "STS 2"]
-        else: return [str(i) for i in range(len(df.columns))]
+    # def getColumnNames(self, filepath, df):
+    #     """Returns the column names of the file at the given path."""
+    #     filetype = self.fileType(filepath)
+    #     if filetype == "animals":
+    #         return ["Animal Number", "Cohort Number", "Animal Key", "Genotype", "Sex", "Lesion", "Implant"]
+    #     elif filetype == "allSeqAllAn":
+    #         return ["Animal Number", "Trial Number", "Sequence Number"]
+    #     elif filetype == "seqRates":
+    #         return ["Original Seq No.", "Group 1 Mean", "Group 1 Var", "N1", "Group 2 Mean", "Group 2 Var", "N2", "Cont", "Len", "STS 1", "STS 2"]
+    #     else: return [str(i) for i in range(len(df.columns))]
 
     def fileTreeItemTriggered(self, item):
         """Called when a file is double clicked in the file tree. Opens the file in the table view."""
         filepath = item.data(0, Qt.ItemDataRole.UserRole)
         if filepath not in self.open_files:
-            self.openFile(filepath)
+            try:
+                self.openFile(filepath)
+            except Exception as e:
+                QMessageBox.critical(self, "File Error", f"""Couldn't open {os.path.basename(filepath)}.\n
+                                                            Details: {e}""")
+                return
         else:
             # Switch to the tab whose filepath matches the selected file
             for i in range(self.fileTabs.count()):
@@ -365,27 +385,34 @@ class FileViewer(QWidget, Ui_FileViewer):
             try:
                 df = pd.read_csv(filepath, header=None)
             except:
-                self.showError("Opening file", "File is not tabular in nature.")
+                QMessageBox.critical(self, "Opening file", "File is not tabular in nature.")
                 return
-            df.columns = self.getColumnNames(filepath, df)
+            # df.columns = self.getColumnNames(filepath, df)
             pd_table = PandasTable(df, self)
             
         elif filepath.endswith(".cbas"):
+            
             cbas_file = CBASFile.loadFile(filepath)
             data = cbas_file.data
             if type(data) == pd.DataFrame:
-                data.columns = self.getColumnNames(filepath, data)
+                # data.columns = self.getColumnNames(filepath, data)
+                data.columns = cbas_file.getColumnHeaders()
                 pd_table = PandasTable(data, self)
             else:
                 df = pd.DataFrame(data)
-                df.columns = self.getColumnNames(filepath, df)
+                # df.columns = self.getColumnNames(filepath, df)
+                df.columns = cbas_file.getColumnHeaders()
                 pd_table = PandasTable(df, self)
+        elif filepath.endswith(".pkl"):
+            # First unpickle then interpret later
+            contents = FileUtils.unpickleObj(filepath)
         
         # New tab
         self.open_files.add(filepath)
         self.fileTabs.addTab(pd_table, os.path.basename(filepath))
         pd_table.setProperty("filepath", filepath)
         self.fileTabs.setCurrentWidget(pd_table)
+        self.updateExportButtonState()
 
     def currentFile(self):
         """Returns the filepath of the currently open file."""
@@ -436,7 +463,7 @@ class FileViewer(QWidget, Ui_FileViewer):
 
     def applyFilters(self):
         if self.currentFile() is None:
-            self.showError("Applying filters", "No file selected.")
+            QMessageBox.critical(self, "No file selected", "Please select a file to apply filters to.")
             return
         queries_and_messages = []
         for i in range(self.filterTable.rowCount()):
@@ -453,15 +480,6 @@ class FileViewer(QWidget, Ui_FileViewer):
     def setDefaultSizes(self):
         # Set the default sizes of the splitter
         self.mainSplitter.setSizes([300, 800, 200])
-
-    def showError(self, action, msg):
-        """Spawn an error dialog"""
-        error_dialog = QMessageBox()
-        error_dialog.setIcon(QMessageBox.Icon.Warning)
-        error_dialog.setText(msg)
-        error_dialog.setWindowTitle(f"Error during {action}")
-        error_dialog.exec()
-
 
     
                 

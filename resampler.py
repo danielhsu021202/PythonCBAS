@@ -1,57 +1,134 @@
 import os
 import numpy as np
+import threading
 from random import choices, seed
 import pandas as pd
-from settings import Settings
+from settings import Settings, CONSTANTS
 from utils import FileUtils
 from files import CBASFile
 import numpy as np
 import multiprocessing
+from scipy.stats import pearsonr
 
+from PyQt6.QtCore import QThread, pyqtSignal, QObject
 
+class ResamplerThread(threading.Thread):
+    def __init__(self, resampler):
+        super(ResamplerThread, self).__init__()
+        self.resampler = resampler
+        self.resampler.resample_start_signal.connect(self.resampler_start)
+        self.resampler.resample_progress_signal.connect(self.resampler_progress)
+        self.resampler.resample_end_signal.connect(self.resampler_end)
+    
+    def run(self):
+        self.resampler.generateResampledMatrix()
 
-class Resampler:
-    def __init__(self, settings: Settings, conts='all', seed=925):
-        self.LANGUAGE = settings.getLanguage()
-        self.CONSTANTS = settings.getConstants()
-        self.ANINFOFORMAT = settings.getAnimalInfoFormat()
-        self.FILES = settings.getFiles()
-        self.CRITERION = settings.getCriterion()
+    def resampler_start(self):
+        print("Resampling started")
+    
+    def resampler_progress(self, progress):
+        print(f"Resampling progress: {progress[0]} {progress[1]}")
+    
+    def resampler_end(self):
+        print("Resampling ended")
+
+class Resampler(QObject):
+    resample_start_signal = pyqtSignal()
+    resample_progress_signal = pyqtSignal(tuple)
+    resample_end_signal = pyqtSignal()
+    def __init__(self, name, counts_dir, max_seq_len: int, conts: list, custom_seed=925):
+        super(Resampler, self).__init__()
+
+        # Setup Files
+        self.counts_dir = counts_dir
+        self.resamples_dir = os.path.join(self.counts_dir, name)
+        if not os.path.exists(self.resamples_dir):
+            os.makedirs(self.resamples_dir)
+
+        self.CONSTANTS = CONSTANTS
+        self.max_seq_len = max_seq_len
         self.conts = conts
-        self.seed = seed
+        if custom_seed is None:
+            custom_seed = 925
+
+        self.seed = custom_seed
+
         self.all_seqcnts_matrix = None
         self.all_animals = None
         self.orig_groups = None
+        self.orig_covariates = None
 
-    def setAllSeqCntsMatrix(self, all_seqcnts_matrix):
-        if self.conts == 'all':
-            self.all_seqcnts_matrix = all_seqcnts_matrix
-        else:
-            self.all_seqcnts_matrix = all_seqcnts_matrix[:, self.conts]
+        self.resampled_matrix = None
+        self.readAllSeqCntsMatarix()
+
+    def getDir(self):
+        return self.resamples_dir
+    
+    def getAllSeqCntsMatrix(self):
+        return self.all_seqcnts_matrix
+
+    def readAllSeqCntsMatarix(self):
+        """
+        Reads all the sequence counts matrices from the counts directory.
+        Only reads the sequence counts matrices for the specified contingencies.
+        """
+        # Initialize an empty matrix that is num_lengths x num_conts
+        self.all_seqcnts_matrix = np.empty((self.max_seq_len, len(self.conts)), dtype=object)
+        seq_cnts_dir = os.path.join(self.counts_dir, Settings.getCountsFolderPaths(self.counts_dir)['SEQCNTSDIR'])
+        for length in np.arange(self.max_seq_len):
+            for i, cont in enumerate(self.conts):
+                seq_cnts_file = CBASFile.loadFile(os.path.join(seq_cnts_dir, f'seqCnts_{cont}_{length+1}.cbas'))
+                seqcnts = seq_cnts_file.getData()
+                self.all_seqcnts_matrix[length][i] = seqcnts
+
+    # def setAllSeqCntsMatrix(self, all_seqcnts_matrix):
+    #     if self.conts == 'all':
+    #         self.all_seqcnts_matrix = all_seqcnts_matrix
+    #     else:
+    #         self.all_seqcnts_matrix = all_seqcnts_matrix[:, self.conts]
+
+    def setGroups(self, orig_groups, all_animals):
+        self.orig_groups = orig_groups
+        self.all_animals = all_animals
+
+    def setCovariates(self, covariates):
+        self.orig_covariates = covariates
         
 
-    def assignGroups(self, filters: list[dict]):
+    def assignGroups(all_animals_matrix, aninfocolumns: list, filters: list[dict]):
         """Assigns animals to groups based on the filters provided."""
-        animal_matrix = pd.read_csv(self.FILES['ANIMALS_FILE'], header=None)
-        an_nums = []
+        animal_matrix = np.array(CBASFile.loadFile(all_animals_matrix).getData())
+        orig_groups = []
         for filter in filters:
             animal_matrix_copy = animal_matrix.copy()
             # Each element in the group is a filter
             for col_name, value in filter.items():
-                col_num = self.ANINFOFORMAT[col_name] + 2  # +2 because the first two columns are animal number and cohort number
-                animal_matrix_copy = animal_matrix_copy[animal_matrix_copy[col_num] == value]
-            an_nums.append(list(animal_matrix_copy[0]))
-        self.orig_groups = an_nums
-        self.all_animals = [animal for group in self.orig_groups for animal in group]
+                col_num = aninfocolumns.index(col_name) + 2  # +2 because the first two columns of animal matrix are animal number and cohort number
+                print(col_name, col_num)
+                animal_matrix_copy = animal_matrix_copy[animal_matrix_copy[:,col_num] == value]
+            orig_groups.append(list(animal_matrix_copy[:,0]))
+        all_animals = [animal for group in orig_groups for animal in group]
+        return orig_groups, all_animals
+        # self.orig_groups = an_nums
+        # self.all_animals = [animal for group in self.orig_groups for animal in group]
     
     def resampleGroups(self, id):
         """Resamples the groups to create new groups of animals."""
-        seed(int(id))
+        seed(self.seed + int(id))
         new_groups = []
         for group in self.orig_groups:
             new_group = choices(self.all_animals, k=len(group))
             new_groups.append(new_group)
+        print(id)
         return new_groups
+    
+    def resampleCovariates(self, id):
+        """Resamples the covariates without replacement."""
+        seed(self.seed + int(id))
+        covariates_copy = self.orig_covariates.copy()
+        np.random.shuffle(covariates_copy)
+        print(id)
+        return covariates_copy
     
     def totalSeqs(self):
         """Returns the total number of sequences in the all_seqcnts_matrix."""
@@ -63,12 +140,13 @@ class Resampler:
         return num_seqs
 
         
-    def getSequenceRatesVerbose(self, groups: list[np.array]):
+    def getSequenceRatesComparisonVerbose(self, groups: list[np.array]):
         """
         Given a list of groups of sequences, returns the sequence rates for each group.
         The columns are:
             Group 1 Averages ... Group n Averages, Original Sequence Number, Length, Contingency
         The rows are sequences, regardless of length and contingency.
+        Verbose version used to generate the sequence rates file for viewing.
         """
         seq_num_col_name = "Original Seq No."
         seq_rates_df = pd.DataFrame()
@@ -113,7 +191,7 @@ class Resampler:
         seq_rates_df['Studentized Test Statistic 2'] = -c1c2
         return seq_rates_df
     
-    def getStudentizedTestStatsPD(self, groups: list[np.array]):
+    def getStudentizedTestStatsComparisonPD(self, groups: list[np.array]):
         """
         Given a list of groups of sequences, returns the sequence rates for each group.
         The columns are:
@@ -158,8 +236,51 @@ class Resampler:
         result = np.repeat(c1c2, 2)
         result[1::2] *= -1
         return result
+    
+    def getStudentizedTestStatsCorrelationalPD(self, covariates):
+        lengths, conts = self.all_seqcnts_matrix.shape
+        studentized_test_stats = None
+        for cont in np.arange(conts):
+            for length in np.arange(lengths):
+                seqcnts = pd.DataFrame(self.all_seqcnts_matrix[length][cont])
+                # Remove subjects with -1 (NaN) values
+                seqcnts = seqcnts.loc[~(seqcnts == self.CONSTANTS['NaN']).any(axis=1)]
+                seqcnts = seqcnts.T
+                n = seqcnts.shape[1]
+                cov_mean = np.mean(covariates)
+                # Each row is a sequence, each column is a subject. The values are sequence counts.
+                # Now we need the pearson's correlation between the sequence counts of an animal with its covariate (just by indexing into the covariate array with the animal's index in the sequence counts matrix)
+                # Apply pearson's correlation between the covariate against every row of the sequence counts matrix
 
-    def getStudentizedTestStats(self, groups: list[np.array], abbrev=False):
+                pearsons_corr = seqcnts.apply(lambda x: pearsonr(x, covariates)[0], axis=1)
+                pearsons_corr = pearsons_corr.fillna(0)
+
+                means = seqcnts.mean(axis=1)  # Mean sequence count for each sequence
+
+                tau_numerator = np.zeros(seqcnts.shape[0])
+                for i in np.arange(n):
+                    # Sum up for each animal
+                    tau_numerator += ((seqcnts.iloc[:,i] - means) ** 2) * ((covariates[i] - cov_mean) ** 2)
+                tau_numerator = np.sqrt(tau_numerator / n)
+
+                tau_denominator = seqcnts.std(axis=1) * covariates.std()
+                
+                tau = tau_numerator / tau_denominator
+
+                t = np.sqrt(n) * pearsons_corr / tau
+
+                if studentized_test_stats is None:
+                    studentized_test_stats = t
+                else:
+                    studentized_test_stats = np.hstack((studentized_test_stats, t))
+        
+
+        sts_repeated = np.repeat(studentized_test_stats, 2)
+        sts_repeated[1::2] *= -1
+        return sts_repeated
+
+
+    def getStudentizedTestStatsComparison(self, groups: list[np.array], abbrev=False):
         """
         Generates one row of the resampled matrix.
         Calculates the studentized test statistics for each sequence.
@@ -200,58 +321,89 @@ class Resampler:
         else:
             return sts
     
-    def resample(self, id=0):
+    def resampleComparison(self, id=0):
         """Performs one resampling of the groups."""
         # Resample the groups
         resampled_groups = self.resampleGroups(id)
         # Calculate the studentized test statistics for the resampled groups
-        return self.getStudentizedTestStatsPD(resampled_groups)
+        return self.getStudentizedTestStatsComparisonPD(resampled_groups)
+    
+    def resampleCorrelation(self, id=0):
+        """performs one resampling of the covariates."""
+        # Resample the covariates
+        resampled_covariates = self.resampleCovariates(id)
+        # Calculate the studentized test statistics for the resampled covariates
+        return self.getStudentizedTestStatsCorrelationalPD(resampled_covariates)
     
     
-    def generateResampledMatrixParallel(self, num_resamples=10000):
+    def generateResampledMatrix(self, correlational: bool, num_resamples=10000):
         """
         Gets the studentized test statistics for the original groups, 
         then resamples the groups and calculates the studentized test statistics for each sequence.
         """
         # First do it for the original groups
-        reference_studentized_test_stats = self.getStudentizedTestStatsPD(self.orig_groups)
+        print(f"Resampling {num_resamples} times")
+        reference_studentized_test_stats = None
+        if correlational:
+            reference_studentized_test_stats = self.getStudentizedTestStatsCorrelationalPD(self.orig_covariates)
+            print(len(self.orig_covariates))
+            print(self.orig_covariates)
+            positives = [val for val in reference_studentized_test_stats if val > 0]
+            print(sum(positives))
+        else:
+            reference_studentized_test_stats = self.getStudentizedTestStatsComparisonPD(self.orig_groups)
 
+        self.resample_start_signal.emit()
+        self.resample_progress_signal.emit((0, "Resampling..."))
         # Create a pool of worker processes
         pool = multiprocessing.Pool()
         # Run self.sample() and append the result to resampled_matrix at the specified index
-        resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
-        resampled_matrix[0] = reference_studentized_test_stats
-        results = pool.map(self.resample, np.arange(1, num_resamples+1))
+        self.resampled_matrix = np.empty((num_resamples+1, self.totalSeqs() * 2))
+        self.resampled_matrix[0] = reference_studentized_test_stats
+        results = None
+        if correlational:
+            results = pool.map(self.resampleCorrelation, np.arange(1, num_resamples+1))
+        else:
+            results = pool.map(self.resampleComparison, np.arange(1, num_resamples+1))
+        print("resampling")
         for i, result in enumerate(results):
-            resampled_matrix[i+1] = result
+            print(i)
+            self.resampled_matrix[i+1] = result
             results[i] = None  # Remove the row from the results to free up memory
         # Close the pool and wait for all processes to finish
         pool.close()
         pool.join()
 
-        return resampled_matrix
+        self.resample_end_signal.emit()
+        # return resampled_matrix
+
+
+
     
-    def generateResampledMatrixParallelAbbrev(self, num_resamples=10000):
+    def generateResampledMatrixComparisonAbbrev(self, num_resamples=10000):
         """
         Gets the studentized test statistics for the original groups, 
         then resamples the groups and calculates the studentized test statistics for each sequence.
         """
-        resampled_matrix = []
+        self.resampled_matrix = []
         # First do it for the original groups
-        studentized_test_stats = self.getStudentizedTestStats(self.orig_groups)
+        studentized_test_stats = self.getStudentizedTestStatsComparisonPD(self.orig_groups)
 
         # Set the first row of the resampled_matrix
-        resampled_matrix.append(studentized_test_stats)
+        self.resampled_matrix.append(studentized_test_stats)
 
         # Create a pool of worker processes
         pool = multiprocessing.Pool()
         # Run self.sample() and append the result to resampled_matrix
-        resampled_matrix.extend(pool.map(self.resample, range(1, num_resamples+1)))
+        self.resampled_matrix.extend(pool.map(self.resample, range(1, num_resamples+1)))
         # Close the pool and wait for all processes to finish
         pool.close()
         pool.join()
 
-        return resampled_matrix
+        return self.resampled_matrix
+    
+    def getResampledMatrix(self):
+        return self.resampled_matrix
 
         
 

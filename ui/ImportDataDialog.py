@@ -330,7 +330,7 @@ class Ui_ImportDataDialog(object):
         self.gridLayout.addWidget(self.Pages, 0, 1, 1, 1)
 
         self.retranslateUi(ImportDataDialog)
-        self.Pages.setCurrentIndex(4)
+        self.Pages.setCurrentIndex(1)
         self.radio_other.toggled['bool'].connect(self.otherDelimiterLineEdit.setEnabled) # type: ignore
         self.radio_other.clicked.connect(self.otherDelimiterLineEdit.setFocus) # type: ignore
         QtCore.QMetaObject.connectSlotsByName(ImportDataDialog)

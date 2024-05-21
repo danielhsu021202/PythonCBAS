@@ -12,13 +12,18 @@ from settings import Settings, DataSet
 
 from ui.ImportDataDialog import Ui_ImportDataDialog
 
+from files import CBASFile
+
 class ColumnSelectTable(QTableWidget):
     def __init__(self, file, delimiter, mode, parent=None):
         super().__init__(parent)
         self.editable = False
 
         self.file = file
-        self.mat = FileUtils.getMatrix(file, delimiter=delimiter, limit_rows=100)
+        self.mat = FileUtils.getMatrix(file, delimiter=delimiter, limit_rows=100, dtype=str)
+
+        # Disable editing
+        self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         
 
         # Populate the table with the matrix, with column headers as indices
@@ -58,7 +63,6 @@ class ColumnSelectTable(QTableWidget):
         elif action == setCovariate:
            # If the covariate column already exists, reset that one first
             for idx, label in self.columns.items():
-                print(idx, label)
                 if label == "Covariate":
                     self.resetColumn(idx)
                     break
@@ -159,6 +163,11 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         # Column Names
         self.anInfoColumns = []
         self.anDataColumns = []
+
+        # File paths
+        self.cohort_file = None
+        self.all_animal_file = None
+        self.all_paths_file = None
 
         # Next button functionality
         self.nextButton.clicked.connect(self.nextPage)
@@ -519,9 +528,9 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         # Append the column names to the list. Use the index if the column is not labeled
         # self.anInfoColumns = {label: i for i, label in self.anInfoTable.columns.items()}
 
-        for  label in self.anInfoTable.columns.values():
+        for i, label in enumerate(self.anInfoTable.columns.values()):
             if label is None:
-                self.anInfoColumns.append(None)
+                self.anInfoColumns.append(f"<column {i}>")
             else:
                 self.anInfoColumns.append(label)
         
@@ -571,7 +580,7 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         self.createDataset()
 
     def processFiles(self):
-        folder = self.proj_obj.getProjectDir()  # The project directory
+        folder = self.proj_obj.getDir()  # The project directory
         self.dataset_dir = os.path.join(folder, self.datasetNameLineEdit.text())  # The dataset directory
         dest = os.path.join(self.dataset_dir, "Data")  # The data directory
         source = self.source_directory_path  # The source directory
@@ -580,25 +589,24 @@ class ImportData(QDialog, Ui_ImportDataDialog):
             shutil.rmtree(self.dataset_dir)
         os.mkdir(self.dataset_dir)
         os.mkdir(dest)
+        
 
         cohortNumbers = {}  # Dictionary to store the cohort names and their corresponding assigned numbers
 
         if self.cohortFoldersCheckBox.isChecked():
-            cohorts = ListUtils.naturalSort([folder for folder in os.listdir(source) if os.path.isdir(os.path.join(source, folder))])
-            for i, cohort in enumerate(cohorts):
-                cohortNumbers[cohort] = i
-                os.mkdir(os.path.join(dest, cohort))
-                files = [file for file in os.listdir(os.path.join(source, cohort)) if FileUtils.validFile(os.path.join(source, cohort, file))]
-                for file in files:
-                    self.processFile(os.path.join(source, cohort, file), os.path.join(dest, cohort))
+            cohorts = ListUtils.naturalSort([os.path.join(source, folder) for folder in os.listdir(source) if os.path.isdir(os.path.join(source, folder))])
         else:
-            cohortNumbers[os.path.basename(source)] = 0
-            files = [file for file in os.listdir(source) if FileUtils.validFile(os.path.join(source, file))]
+            cohorts = [source]
+        for i, cohort_folder in enumerate(cohorts):
+            cohort_name = os.path.basename(cohort_folder)
+            cohortNumbers[cohort_name] = i
+            os.mkdir(os.path.join(dest, cohort_name))
+            files = [file for file in os.listdir(cohort_folder) if FileUtils.validFile(os.path.join(cohort_folder, file))]
             for file in files:
-                self.processFile(os.path.join(source, file), dest)
+                self.processFile(os.path.join(cohort_folder, file), os.path.join(dest, cohort_name))
 
-
-        self.writeCohortFile(os.path.join(self.dataset_dir, "cohorts.txt"), cohortNumbers)
+        self.cohort_file = os.path.join(self.dataset_dir, "cohorts.txt")
+        self.writeCohortFile(self.cohort_file, cohortNumbers)
         self.processAnimalMetadata(cohortNumbers, dest)
                     
                 
@@ -630,24 +638,34 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         animal_num = 0
 
         all_paths = []
-        animal_file = os.path.join(self.dataset_dir, "animals.txt")
-        with open(animal_file, 'w') as f:
-            for cohort_name, cohort_num in cohort_dict.items():
-                cohort_folder = os.path.join(data_dir, cohort_name)
-                info_file = os.path.join(cohort_folder, self.an_info_name)
-                animal_files = ListUtils.naturalSort([name for name in os.listdir(cohort_folder) if os.path.isfile(os.path.join(cohort_folder, name)) 
-                                                         and name != self.an_info_name
-                                                         and not name.startswith('.')])
-                all_paths += [os.path.join(cohort_folder, file) for file in animal_files]
-                animal_info_matrix = FileUtils.getMatrix(info_file, delimiter=self.delimiter)
-                # Get rid of hidden files
-                animal_files = [file for file in animal_files if not file.startswith('.')]
-                assert len(animal_files) == len(animal_info_matrix)
-                for i, animal_file in enumerate(animal_files):
-                    animal_info = animal_info_matrix[i]
-                    f.write(f"{animal_num},{cohort_num},{','.join([str(int(x)) for x in animal_info])}\n")
-                    animal_num += 1
-        FileUtils.pickleObj(all_paths, os.path.join(self.dataset_dir, 'all_paths.pkl'))
+        # self.animal_file = os.path.join(self.dataset_dir, "animals.txt")
+        animal_matrix = []
+        for cohort_name, cohort_num in cohort_dict.items():
+            cohort_folder = os.path.join(data_dir, cohort_name)
+            info_file = os.path.join(cohort_folder, self.an_info_name)
+            animal_files = ListUtils.naturalSort([name for name in os.listdir(cohort_folder) if os.path.isfile(os.path.join(cohort_folder, name)) 
+                                                        and name != self.an_info_name
+                                                        and not name.startswith('.')])
+            all_paths += [os.path.join(cohort_folder, file) for file in animal_files]
+            animal_info_matrix = FileUtils.getMatrix(info_file, delimiter=self.delimiter, dtype=(
+                str if "Covariate" in self.anInfoColumns else int
+            ))
+            # Get rid of hidden files
+            animal_files = [file for file in animal_files if not file.startswith('.')]
+            assert len(animal_files) == len(animal_info_matrix)
+            for i, animal_file in enumerate(animal_files):
+                animal_info = animal_info_matrix[i]
+                row = [animal_num, cohort_num]
+                row.extend(animal_info)
+                animal_matrix.append(row)
+                animal_num += 1
+        
+        animal_matrix_file = CBASFile("all_animals", np.array(animal_matrix), col_headers=["Animal No.", "Cohort No."] + self.anInfoColumns)
+        animal_matrix_file.saveFile(self.dataset_dir)
+        self.all_animals_file_path = os.path.join(self.dataset_dir, "all_animals.cbas")
+
+        self.all_paths_file = os.path.join(self.dataset_dir, "all_paths.pkl")
+        FileUtils.pickleObj(all_paths, self.all_paths_file)
         self.num_animals = len(all_paths)
 
         
@@ -664,31 +682,24 @@ class ImportData(QDialog, Ui_ImportDataDialog):
                               int(self.numChoicesLineEdit.text()),
                               self.hasModifier,
                               int(self.numContingenciesLineEdit.text()),
-                              self.num_animals,       
+                              self.num_animals,
+                              self.cohort_file_path,
+                              self.all_animals_file_path,
+                              self.all_paths_file,       
         )
         dataset.setParent(self.proj_obj)
         self.returnValue = dataset
         self.close()
 
     def writeCohortFile(self, file, cohort_dict: dict):
-        with open(file, 'w') as f:
-            for cohort, i in cohort_dict.items():
-                f.write(f"{cohort},{i}\n")
+        cohort_matrix = []
+        for cohort, i in cohort_dict.items():
+            cohort_matrix.append([cohort, i])
+        cohort_matrix = np.array(cohort_matrix)
+        cohort_file = CBASFile("cohorts", cohort_matrix, col_headers=["Cohort", "Cohort No."])
+        cohort_file.saveFile(self.dataset_dir)
+        self.cohort_file_path = os.path.join(self.dataset_dir, "cohorts.cbas")
         
-    def spawnLoadingDialog(self):
-        # Create a dialog with a loading bar in it and no buttons
-        loadingDialog = QDialog(parent=self)
-        loadingDialog.setWindowTitle("Processing Files")
-        loadingDialog.resize(300, 100)
-        layout = QVBoxLayout()
-        loadingDialog.setLayout(layout)
-        label = QLabel()
-        progress = QProgressBar()
-        progress.setValue(0)
-        layout.addWidget(label)
-        layout.addWidget(progress)
-        loadingDialog.show()
-        return loadingDialog, progress, label
 
 
 

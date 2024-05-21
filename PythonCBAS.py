@@ -1,7 +1,6 @@
 from sequences import SequencesProcessor
 from resampler import Resampler
 from statistical_analyzer import StatisticalAnalyzer
-from files import FileManager
 from settings import Settings
 
 import sys
@@ -34,129 +33,6 @@ from files import CBASFile
 
 import datetime
 
-def format_time(seconds):
-    duration = datetime.timedelta(seconds=seconds)
-    if duration < datetime.timedelta(milliseconds=1):
-        return "{:.2f} microseconds".format(duration.microseconds)
-    elif duration < datetime.timedelta(seconds=1):
-        return "{:.2f} milliseconds".format(duration.microseconds / 1000)
-    elif duration < datetime.timedelta(minutes=1):
-        return "{:.2f} seconds".format(duration.total_seconds())
-    elif duration < datetime.timedelta(hours=1):
-        return "{:.2f} minutes".format(duration.total_seconds() / 60)
-    elif duration < datetime.timedelta(days=1):
-        return "{:.2f} hours".format(duration.total_seconds() / 3600)
-    else:
-        return "{:.2f} days".format(duration.total_seconds() / 86400)
-
-
-def startCBASTerminal(num_samples):
-    divider = "=" * 65
-
-    start = time.time()
-
-    section_start = time.time()
-    print("Starting PythonCBAS Engine...")
-    print(divider)
-    print("Retrieving settings...")
-    settings = Settings()
-    # settings.setCriterion({'ORDER': 0, 'NUMBER': float('inf'), 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
-    settings.setCriterion({'ORDER': 4, 'NUMBER': 100, 'INCLUDE_FAILED': True, 'ALLOW_REDEMPTION': True})
-    CRITERION = settings.getCriterion()
-    print(f'''CRITERION:  Order {CRITERION['ORDER']}, 
-            Number {CRITERION['NUMBER']}, 
-            {'Include' if CRITERION['INCLUDE_FAILED'] else 'Exclude'} Failed, 
-            {'' if CRITERION['ALLOW_REDEMPTION'] else "Don't "}Allow Redemption''')
-    conts = [int(cont) for cont in args.contingencies.split(",")] if args.contingencies != "all" else "all"
-    print("Settings retrieved. Time taken: ", format_time(time.time() - section_start))
-
-    print(divider)
-    section_start = time.time()
-    print("Setting up files...")
-    fileManager = FileManager(settings.getFiles())
-    fileManager.setupFiles()
-    print("Files set up. Time taken: ", format_time(time.time() - section_start))
-
-    print(divider)
-    section_start = time.time()
-    print("Processing sequences and calculating criterion...")
-    sequencesProcessor = SequencesProcessor("output_new", settings.getAnimalFileFormat(), settings.getLanguage(), CRITERION, {}, 245)
-    sequencesProcessor.processAllAnimals()
-    print("Sequences and criterion processed. Time taken: ", format_time(time.time() - section_start))
-
-    print(divider)
-    section_start = time.time()
-    print("Generating sequence and criterion files...")
-    sequencesProcessor.generateSequenceFiles()
-    all_seq_cnts = sequencesProcessor.exportAllSeqCnts(conts)
-    print("Sequence and criterion files generated. Time taken: ", format_time(time.time() - section_start))
-
-    sequencesProcessor.dumpMemory()
-
-    print(divider)
-    section_start = time.time()
-    print("Grouping animals...")
-    
-    
-    resampler = Resampler(settings, conts=conts)
-    resampler.setAllSeqCntsMatrix(all_seq_cnts)
-    resampler.assignGroups([{"GENOTYPE": 0, "LESION": 0}, {"GENOTYPE": 1, "LESION": 0}])
-    print("Groups assigned:")
-    for i, group in enumerate(resampler.orig_groups):
-        print(f"Group {i + 1}: {len(group)} animals")
-    print("Time taken: ", format_time(time.time() - section_start))
-    section_start = time.time()
-    print("Calculating sequence rates...")
-    seq_rates_matrix = resampler.getSequenceRatesVerbose(resampler.orig_groups)
-    print("Sequence rates calculated. Time taken: ", format_time(time.time() - section_start))
-    section_start = time.time()
-    print("Writing sequence rates to file...")
-    resampler.writeSequenceRatesFile(seq_rates_matrix)
-    print("Sequence rates written to file. Time taken: ", format_time(time.time() - section_start))
-
-    print(divider)
-    section_start = time.time()
-    print(f"Resampling {num_samples} times, considering contingencies {conts}...")
-    resampled_matrix = resampler.generateResampledMatrixParallel(num_resamples=num_samples)
-    print(f"Resampling finished. Time taken: ", format_time(time.time() - section_start))
-    section_start = time.time()
-    print("Writing resampled matrix to file...")
-    cont_str = "all" if conts == "all" else "_".join([str(cont) for cont in conts])
-    resampler.writeResampledMatrix(resampled_matrix, filename=f'resampled_mat_{num_samples}_samples_cont_{cont_str}')
-    print("Resampled matrix written to file. Time taken: ", format_time(time.time() - section_start))
-
-
-
-    print(divider)
-    section_start = time.time()
-    print("Calculating p-values...")
-    stats_analyzer = StatisticalAnalyzer(resampled_matrix)
-    # p_values = stats_analyzer.getPValuesFullParallel(k=2, alpha=0.05)
-    # print(p_values)
-    # print("P-values calculated. Time taken: ", format_time(time.time() - section_start))
-    # sys.exit()
-
-    p_values, k = stats_analyzer.fdpControl(alpha=0.5, gamma=0.05, abbreviated=False)
-    
-    print(f"Stopped at k={k}")
-    print("P-values calculated. Time taken: ", format_time(time.time() - section_start))
-
-    section_start = time.time()
-    print("Writing significant sequences to file...")
-
-    p_val_mat = []
-    for p_val, seq_num in p_values:
-        seq, cont, length, local_num = sequencesProcessor.getSequence(seq_num)
-        p_val_mat.append([p_val, seq, cont, length, local_num])
-    p_val_mat = np.array(p_val_mat, dtype=object)
-    p_val_file = CBASFile("significant_sequences", p_val_mat)
-    p_val_file.saveFile(settings.getFiles()['OUTPUT'])
-
-    print(f"Significant sequences written to file. {len(p_val_mat)} sequences found. \nTime taken: ", format_time(time.time() - section_start))
-
-    print(divider)
-    print(f"Total Time: {format_time(time.time() - start)}")
-    sys.exit()
 
 
 class Lobby(QDialog, Ui_Lobby):
@@ -260,18 +136,11 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         
-        
         self.project = project
 
         self.setWindowTitle("PythonCBAS: " + project.getName())
 
         self.setUpMenuBar()
-
-
-
-        # # Add the File Viewer Frame to the main stack
-        # self.fileViewer = FileViewer()
-        # self.FileViewerPage.layout().addWidget(self.fileViewer)
 
         self.navigator = Navigator(project_obj=self.project)
         self.NavigatorPage.layout().addWidget(self.navigator)
@@ -303,7 +172,6 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
     def setUpMenuBar(self):
         self.menubar = self.menuBar()
         # self.menubar.setNativeMenuBar(False)  # For macOS
-        self.actionGet_Sequences.triggered.connect(self.runCBAS)
         self.actionDarkTheme.triggered.connect(lambda: qdarktheme.setup_theme("dark", additional_qss=qss))
         self.actionLightTheme.triggered.connect(lambda: qdarktheme.setup_theme("light"))
         self.actionAutoTheme.triggered.connect(lambda: qdarktheme.setup_theme("auto", additional_qss=qss))
@@ -313,59 +181,42 @@ class PythonCBAS(QMainWindow, Ui_MainWindow):
         self.actionCard.triggered.connect(self.showExampleCard)
         
 
-    def runCBAS(self):
-        startCBASTerminal()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="PythonCBAS")
-    parser.add_argument("-s", "--sequence", help="Run sequencing in terminal mode", action="store_true")
-    parser.add_argument("-n", "--num_samples", help="Number of samples to resample", type=int, default=0)
-    parser.add_argument("-c", "--contingencies", help="List of contingencies to include in the resampling, comma-separated", type=str, default="all")
-    args = parser.parse_args()
 
     # Set current working directory to this file
     os.chdir(os.path.dirname(os.path.realpath(__file__)))
-
-    if args.sequence:
-        if args.sequence:
-            startCBASTerminal(args.num_samples)
-        sys.exit()
-    else:
-        app = QApplication(sys.argv)
-
-        # Load App Configurations
-        appdatafolder = os.path.join("AppData")
-        if not os.path.exists(appdatafolder):
-            os.mkdir(appdatafolder)
-
-        filepath = os.path.join(appdatafolder, "preferences.json")
-        preferences = Preferences(os.path.join(appdatafolder, "preferences.json"))
-        if not os.path.exists(filepath):
-            preferences.writePreferences()
-        else:
-            preferences.readPreferences(filepath)
-
-
-
-        # Load ui/styles.qss
-        with open("ui/styles.qss", "r") as f:
-            qss = f.read()
-
-        
-
-        qdarktheme.setup_theme("auto", additional_qss=qss)
-
     
-        
-        
-        lobby = Lobby(preferences)
-        project = lobby.run()
-        if project is not None:
-            mainWindow = PythonCBAS(project)
-            mainWindow.show()
-        else:
-            sys.exit()
-        
-        sys.exit(app.exec())
+    app = QApplication(sys.argv)
+
+    # Load App Configurations
+    appdatafolder = os.path.join("AppData")
+    if not os.path.exists(appdatafolder):
+        os.mkdir(appdatafolder)
+
+    filepath = os.path.join(appdatafolder, "preferences.json")
+    preferences = Preferences(os.path.join(appdatafolder, "preferences.json"))
+    if not os.path.exists(filepath):
+        preferences.writePreferences()
+    else:
+        preferences.readPreferences(filepath)
+
+
+
+    # Load ui/styles.qss
+    with open("ui/styles.qss", "r") as f:
+        qss = f.read()
+
+    qdarktheme.setup_theme("auto", additional_qss=qss)
+
+    lobby = Lobby(preferences)
+    project = lobby.run()
+    if project is not None:
+        mainWindow = PythonCBAS(project)
+        mainWindow.show()
+    else:
+        sys.exit()
+    
+    sys.exit(app.exec())
 
         

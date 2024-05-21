@@ -3,9 +3,12 @@ from ui.NavigatorFrame import Ui_NavigatorFrame
 from Card import Card
 from ImportData import ImportData
 from SettingsDialog import SettingsDialog
-from settings import Project, DataSet, Counts, Resamples, Pvalues, Visualizations, prev_type
+from settings import Project, DataSet, Counts, Resamples, Visualizations, prev_type
+from FileViewer import FileViewer
 
-from PyQt6.QtWidgets import QWidget
+from utils import StringUtils
+
+from PyQt6.QtWidgets import QWidget, QMainWindow, QApplication, QMessageBox
 from PyQt6 import QtCore
 
 class Navigator(QWidget, Ui_NavigatorFrame):
@@ -19,15 +22,22 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         self.CardGrid.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft)
 
         self.backButton.clicked.connect(self.goBack)
+        
 
         # self.project = project_obj
         self.obj = project_obj
         self.proj_obj = project_obj
         # self.prev_obj = None
 
+        self.fileViewerButton.clicked.connect(lambda: self.spawnFileViewer(self.obj.getDir()))
+
         self.backButton.setDisabled(True)
 
         self.populateItems(self.obj, "dataset")
+
+
+    def getProject(self):
+        return self.proj_obj
 
     def goBack(self):
         if self.obj.getParent() is not None:
@@ -70,34 +80,68 @@ class Navigator(QWidget, Ui_NavigatorFrame):
             card.newItemButton.clicked.connect(self.addDataset)
         elif self.mode == "counts":
             card.newItemButton.clicked.connect(self.addCounts)
+        elif self.mode == "resamples":
+            card.newItemButton.clicked.connect(self.addResamples)
 
 
     def addDataset(self):
-        assert type(self.obj) == Project
-        importData = ImportData(self.obj)
-        dataset = importData.run()
-        if dataset is not None:
-            self.obj.addDataset(dataset)
-            self.obj.writeProject()
-            self.populateItems(self.obj, "dataset")
+        try:
+            assert type(self.obj) == Project
+            importData = ImportData(self.obj)
+            dataset = importData.run()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred during dataset import: {str(e)}")
+            return
+
+        try:
+            if dataset is not None:
+                self.obj.addDataset(dataset)
+                self.obj.writeProject()
+                self.populateItems(self.obj, "dataset")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred during dataset creation: {str(e)}")
+            return
 
     def addCounts(self):
-        assert type(self.obj) == DataSet
-        countsSettings = SettingsDialog("counts", proj_obj=self.proj_obj, parent_obj=self.obj)
-        counts = countsSettings.run()
-        if counts is not None:
-            self.obj.addCounts(counts)
-            self.obj.writeProject()
-            self.populateItems(self.obj, "counts")
+        try:
+            assert type(self.obj) == DataSet
+            countsSettings = SettingsDialog("counts", proj_obj=self.proj_obj, parent_obj=self.obj, parent=self)
+            counts = countsSettings.run()
+            if counts is not None:
+                self.obj.addCounts(counts)
+                self.obj.writeProject()
+                self.populateItems(self.obj, "counts")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred during counts creation: {str(e)}")
+            return
 
     def addResamples(self):
-        assert type(self.obj) == Counts
-        resamplesSettings = SettingsDialog("resamples", proj_obj=self.proj_obj, parent_obj=self.obj)
-        resamples = resamplesSettings.run()
-        if resamples is not None:
-            self.obj.addResamples(resamples)
-            self.obj.writeProject()
-            self.populateItems(self.obj, "resamples")
+        try:
+            assert type(self.obj) == Counts
+            resamplesSettings = SettingsDialog("resamples", proj_obj=self.proj_obj, parent_obj=self.obj, parent=self)
+            resamples = resamplesSettings.run()
+            if resamples is not None:
+                self.obj.addResamples(resamples)
+                self.obj.writeProject()
+                self.populateItems(self.obj, "resamples")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred during resamples creation: {str(e)}")
+            return
+
+
+    def spawnFileViewer(self, directory):
+        # Spawn an independent instance of the window
+        window = QMainWindow(parent=self)
+        viewer = FileViewer(directory)
+        window.setCentralWidget(viewer)
+        print(type(self.obj))
+        window.setWindowTitle(f"FileViewer: {self.obj.getName()} [{StringUtils.capitalizeFirstLetter(self.obj.getType())}]")
+        # Set size
+        window.resize(1500, 860)
+        # Center on screen
+        window.move(QApplication.primaryScreen().geometry().center() - self.frameGeometry().center())
+
+        window.show()
 
 
 

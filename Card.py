@@ -1,8 +1,10 @@
 from PyQt6 import QtCore, QtGui
-from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout, QMenu
+from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout, QMenu, QMessageBox, QMainWindow
 
 from ui.Card_ui import Ui_Card
 from settings import DataSet, Counts, Resamples, next_type
+
+from FileViewer import FileViewer
 
 from utils import StringUtils
 
@@ -18,6 +20,7 @@ class Card(QWidget, Ui_Card):
             self.type = self.obj.getType() if self.obj is not None else None
             title, subtitle = self.obj.getCardInfo()
             self.TitleLabel.setText(title)
+            self.TitleLabel.setWordWrap(True)
             self.TypeLabel.setText(StringUtils.capitalizeFirstLetter(self.type))
             self.SubtitleLabel.setText(subtitle)
         
@@ -29,9 +32,9 @@ class Card(QWidget, Ui_Card):
             if next_type[self.type] is not None:
                 self.mouseDoubleClickEvent = lambda _: self.navigator.populateItems(self.obj, next_type[self.type])
 
-        # On right click, spawn menu
-        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.menuActions)
+            # On right click, spawn menu
+            self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+            self.customContextMenuRequested.connect(self.menuActions)
 
         # Set stylesheet
         self.setStyleSheet("""
@@ -85,12 +88,27 @@ class Card(QWidget, Ui_Card):
         menu.addSeparator()
 
         # General Actions
-        menu.addAction("Rename")
-        menu.addAction("Delete")
-        menu.addAction("Open in FileViewer")
+        rename_action = menu.addAction("Rename")
+        delete_action = menu.addAction("Delete")
+        fileviewer_action = menu.addAction("Open in FileViewer")
+
 
         # Execute at mouse position
-        menu.exec(QtGui.QCursor.pos())
+        action = menu.exec(QtGui.QCursor.pos())
+
+        # Actions
+        if action == rename_action:
+            pass
+        elif action == delete_action:
+            # Prompt for deletion
+            reply = QMessageBox.question(self, 'Delete', f"Are you sure you want to delete {self.obj.getName()} and all the files associated with it?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self.obj.getParent().deleteChild(self.obj)
+                self.navigator.getProject().writeProject()
+                self.navigator.populateItems(self.navigator.obj, self.navigator.mode)
+        elif action == fileviewer_action:
+            self.navigator.spawnFileViewer(self.obj.getDir())
+            
 
 
         
