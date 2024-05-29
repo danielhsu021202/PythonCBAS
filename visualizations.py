@@ -4,8 +4,11 @@ if not os.path.exists(qtwebengine_dictionaries_path):
     os.mkdir(qtwebengine_dictionaries_path)
 os.environ["QTWEBENGINE_DICTIONARIES_PATH"] = qtwebengine_dictionaries_path
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+import sys
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout
+from ui.UI_VisualizerWindow import Ui_VisualizerWindow
+
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QToolBox, QFileDialog
 
 import plotly.figure_factory as ff
 import plotly.express as px
@@ -16,23 +19,59 @@ import pandas as pd
 
 from utils import WebUtils
 
+class VisualizerWindow(QDialog, Ui_VisualizerWindow):
+    def __init__(self, name, visualizations, parent=None):
+        super(VisualizerWindow, self).__init__()
+        self.setupUi(self)
+
+        self.parent = parent
+        self.setWindowTitle(name)
+        self.visualizations = visualizations
+
+        self.web_view = QWebEngineView()
+        self.webEngineWidget.setLayout(QVBoxLayout())
+        self.webEngineWidget.layout().setContentsMargins(0, 0, 0, 0)
+        self.webEngineWidget.layout().addWidget(self.web_view)
+
+        
+
+
+        self.html = WebUtils.htmlStartPlotly()
+
+        for fig in self.visualizations:
+            self.html += pio.to_html(fig, include_plotlyjs=WebUtils.plotly_latest_js_url, full_html=False)
+
+        self.html += WebUtils.htmlEnd()
+
+        self.web_view.setHtml(self.html)
+
+        self.htmlButton.clicked.connect(self.toHTML)
+
+        self.resize(1200, 900)
+
+    def toHTML(self):
+        file, _ = QFileDialog.getSaveFileName(self.parent, "Save HTML", filter="HTML Files (*.html)")
+        if file:
+            with open(file, 'w') as f:
+                f.write(self.html)
+
+
 
 class Visualizer:
     def __init__(self, name, parent):
         self.name = name
         self.parent = parent
         self.visualizations = []
-        self.web_view = QWebEngineView()
 
 
-    def createScatterPlot(self, matrix):
+    def createScatterPlot(self, matrix, title="", xaxis_title="", yaxis_title=""):
         # Scatter plot of the list
         # x is index, y is max of that row
         df = pd.DataFrame(matrix)
         # fig = px.scatter(df, x=df.index, y=df.max(axis=1))
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df.max(axis=1), mode='markers'))
-        fig.update_layout(title="Scatter Plot", xaxis_title="Index", yaxis_title="Max Value")
+        fig.update_layout(title=title, xaxis_title=xaxis_title, yaxis_title=yaxis_title)
         
         # Display the plot in pyqt
 
@@ -42,14 +81,19 @@ class Visualizer:
         
 
     def showWindow(self):
-        dialog = QDialog(parent=self.parent)
-        layout = QVBoxLayout()
-        fig = self.visualizations[0]
-        self.web_view.setHtml(pio.to_html(fig, include_plotlyjs='cdn'))
-        layout.addWidget(self.web_view)
-        dialog.setLayout(layout)
-        dialog.resize(800, 600)
-        dialog.show()
+        VisualizerWindow(self.name, self.visualizations, self.parent).exec()
+
+    
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = QMainWindow()
+    viz = Visualizer("Test", window)
+    viz.createScatterPlot([[1, 2, 3], [4, 5, 6], [7, 8, 9]], title="Test", xaxis_title="X", yaxis_title="Y")
+    viz.showWindow()
+
+    sys.exit(app.exec())
         
 
 

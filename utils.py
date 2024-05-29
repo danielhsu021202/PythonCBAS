@@ -8,6 +8,8 @@ import json
 import gzip
 import datetime
 import subprocess
+import requests
+import webbrowser
 from scipy.sparse import csr_matrix
 
 class ReturnContainer:
@@ -205,12 +207,43 @@ class TimeUtils:
             return "{:.2f} days".format(duration.total_seconds() / 86400)
 
 class WebUtils:
+    plotly_js_path = os.path.abspath("js/plotly-2.32.0.min.js")
+    plotly_latest_js_url = "https://cdn.plot.ly/plotly-latest.min.js"
+
+    def fetchLatestPlotlyJS():
+        if not WebUtils.check_internet_connection():
+            raise Exception("No internet connection to fetch plotly.js file.")
+        if not os.path.exists("js"):
+            os.mkdir("js")
+        if not os.path.exists(WebUtils.plotly_js_path):
+            # Fetch the plotly.js file
+            with open(WebUtils.plotly_js_path, 'wb') as f:
+                f.write(requests.get(WebUtils.plotly_latest_js_url).content)
+
+
     def check_internet_connection():
         try:
             subprocess.check_output(["ping", "-c", "1", "www.google.com"])
             return True
         except subprocess.CalledProcessError:
             return False
+        
+    def htmlStartPlotly():
+        return f"""
+            <html>
+            <head>
+                <script src="{WebUtils.plotly_latest_js_url}"></script>
+            </head>
+            <body>
+        """
+    
+    def htmlEnd():
+        return """
+            </body>
+            </html>
+        """
+
+
         
 
 # Test WebUtils

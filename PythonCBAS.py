@@ -28,8 +28,7 @@ from settings import Project, Preferences
 
 
 
-from utils import FileUtils
-from files import CBASFile
+from utils import WebUtils
 
 import datetime
 
@@ -62,13 +61,16 @@ class Lobby(QDialog, Ui_Lobby):
         return self.returnValue
     
     def getDirectory(self):
-        """Open a file dialog to get a directory"""
-        dir = QFileDialog.getExistingDirectory(self, "Select Directory")
+        """
+        Open a file dialog to get a directory
+        Default is the Documents folder
+        """
+        dir = QFileDialog.getExistingDirectory(self, "Select Directory", directory=os.path.expanduser("~"))
         self.projectLocationField.setText(dir)
 
     def getProject(self):
         """Open a file dialog to get .json or .cbasproj file"""
-        filepath, _ = QFileDialog.getOpenFileName(self, "Open Project", filter="PythonCBAS Project (*.json *.cbasproj)")
+        filepath, _ = QFileDialog.getOpenFileName(self, "Open Project", filter="PythonCBAS Project (*.json *.cbasproj)", directory=os.path.expanduser("~"))
         if filepath:
             self.loadProject(filepath)
 
@@ -200,6 +202,8 @@ if __name__ == "__main__":
         preferences.writePreferences()
     else:
         preferences.readPreferences(filepath)
+
+    # WebUtils.fetchLatestPlotlyJS()
 
 
 

@@ -8,6 +8,8 @@ from resampler import Resampler
 from statistical_analyzer import StatisticalAnalyzer
 from visualizations import Visualizer
 
+from ui.ProgressDialog import Ui_ProgressDialog
+
 from utils import TimeUtils, ReturnContainer
 from files import CBASFile
 
@@ -20,7 +22,7 @@ import time
 import numpy as np
 import pandas as pd
 
-class ProgressDialog(QDialog):
+class ProgressDialog(QDialog, Ui_ProgressDialog):
     """
     Spawns a QDialog with a that is a UI displaying the progress for a running process, expressed as a QThread object.
    
@@ -40,6 +42,7 @@ class ProgressDialog(QDialog):
                  start_signal: pyqtSignal, running_signal: pyqtSignal, end_signal: pyqtSignal, 
                  parent=None):
         super(ProgressDialog, self).__init__(parent)
+        self.setupUi(self)
 
         self.progress_max = progress_max
         self.returnValue = None
@@ -47,21 +50,14 @@ class ProgressDialog(QDialog):
         self.display_percent = False
         
         # UI Setup
-        self.resize(300, 150)
+        self.resize(300, 200)
 
         self.setWindowTitle(title)
-        self.progressLabel = QLabel()
-        self.progressBar = QProgressBar()
-        self.timeElapsed = QLabel()
+
+        self.cancelButton.clicked.connect(self.cancel)
 
         self.timeElapsed.setText("Time elapsed: 0.00 seconds")
 
-        self.layout = QVBoxLayout()
-        self.layout.addWidget(self.progressLabel)
-        self.layout.addWidget(self.progressBar)
-        self.layout.addWidget(self.timeElapsed)
-
-        self.setLayout(self.layout)
         self.running_thread = QThread()
         self.worker.moveToThread(self.running_thread)
         self.running_thread.started.connect(worker_function)
@@ -126,6 +122,17 @@ class ProgressDialog(QDialog):
         """Run the dialog and return the return value from the worker thread."""
         self.running_thread.start()
         self.exec()
+        return self.returnValue
+    
+    def cancel(self):
+        """Cancel the running process."""
+        try:
+            self.running_thread.quit()
+            self.running_thread.wait()
+        except Exception as e:
+            pass
+        self.close()
+        self.returnValue = None
         return self.returnValue
 
 
@@ -286,7 +293,6 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
 
     def scanCriterionOrder(self):
         """
-        TODO: Histogram
         Scan the criterion order.
         """
         assert type(self.parent_obj) == DataSet
@@ -307,15 +313,15 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                           processor, processor.scanCriterionOrder, processor.getCriterionMatrix,
                                           processor.start_processing_signal, processor.processing_progress_signal, processor.scan_complete_signal, self).run()
         
-        self.visualizeButton.setDisabled(False)
+        self.visualizeButton.setDisabled(self.scanned_criterion_matrix is None)
 
     def visualizeCriterionOrder(self):
         # Generate a scatter plot of the criterion matrix and open a dialog to display it
         
         criterion_matrix = pd.DataFrame(self.scanned_criterion_matrix).fillna(0)
 
-        visualizer = Visualizer("Criterion Matrix", parent=self)
-        visualizer.createScatterPlot(criterion_matrix)
+        visualizer = Visualizer("Criterion", parent=self)
+        visualizer.createScatterPlot(criterion_matrix, "Maximum # of Perfect Performance Sequences per Subject", "Subject #", "Number of Perfect Performance Sequences")
         visualizer.showWindow()
     
 

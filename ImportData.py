@@ -259,7 +259,7 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         HELPER FUNCTION
         Open a file dialog and select a directory to import data from.
         """
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory")
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory", directory=os.path.expanduser("~"))
         if directory:
             line_edit.setText(directory)
 
