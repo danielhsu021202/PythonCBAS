@@ -73,6 +73,7 @@ class Ui_Lobby(object):
         self.verticalLayout_2.addWidget(self.label_4)
         self.recentlyOpenedTable = QtWidgets.QTableWidget(parent=self.StartPage)
         self.recentlyOpenedTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.recentlyOpenedTable.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.recentlyOpenedTable.setShowGrid(False)
         self.recentlyOpenedTable.setObjectName("recentlyOpenedTable")
         self.recentlyOpenedTable.setColumnCount(2)

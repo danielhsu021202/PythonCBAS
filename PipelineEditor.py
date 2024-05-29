@@ -132,7 +132,13 @@ class PipelineDialog(QDialog, Ui_PipelineDialog):
             mode, axis, index, operation, value = stage[1:]
             operation_str = operation
             operation = PipelineDialog.translateOperation(operation)
-            ticked_column_names = [(f"`{col}`") for col in column_names]
+            # (f"`{col}`") for col in column_names if not col.isnumeric()
+            ticked_column_names = []
+            for col in column_names:
+                if not type(col) == int:
+                    ticked_column_names.append(f"`{col}`")
+                else:
+                    ticked_column_names.append(str(col))
             if axis == "all cells":
                 if operation == "between":
                     query = ' or '.join([f"({str(col)} >= {int(value[0])} and {str(col)} <= {int(value[1])})" for col in ticked_column_names])

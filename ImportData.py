@@ -1,5 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QVBoxLayout, QTextEdit, QListWidgetItem, QFileDialog, QTableWidget, QLabel, QTableWidgetItem, QMessageBox, QDialog, QMenu, QPushButton, QLineEdit, QLabel, QProgressBar
-from PyQt6.QtGui import QIcon, QCursor
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QTextEdit, QListWidgetItem, QFileDialog, QTableWidget, QLabel, QTableWidgetItem, QMessageBox, QDialog, QMenu, QPushButton, QLineEdit, QLabel
 from PyQt6.QtCore import Qt
 
 import os
@@ -259,7 +258,7 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         HELPER FUNCTION
         Open a file dialog and select a directory to import data from.
         """
-        directory = QFileDialog.getExistingDirectory(self, "Select Directory", directory=os.path.expanduser("~"))
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory", directory=Settings.getDocumentsFolder())
         if directory:
             line_edit.setText(directory)
 

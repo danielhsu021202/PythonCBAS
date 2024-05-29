@@ -44,7 +44,7 @@ class CBASFile:
     
     def getColumnHeaders(self):
         if self.col_headers is None:
-            return [i for i in range(self.data.shape[1])]
+            return [f"c{i}" for i in range(self.data.shape[1])]
         return self.col_headers
     
 

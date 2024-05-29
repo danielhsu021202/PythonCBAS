@@ -66,7 +66,7 @@
       </sizepolicy>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="CountsSettingsPage">
       <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -287,7 +287,7 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-391</y>
+            <y>-370</y>
             <width>363</width>
             <height>733</height>
            </rect>

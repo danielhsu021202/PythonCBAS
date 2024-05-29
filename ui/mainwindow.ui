@@ -54,22 +54,6 @@
      <height>37</height>
     </rect>
    </property>
-   <widget class="QMenu" name="temporary_menu">
-    <property name="title">
-     <string>Temporary Running</string>
-    </property>
-    <addaction name="actionGet_Sequences"/>
-    <addaction name="actionGenerate_Groups"/>
-    <addaction name="actionCard"/>
-   </widget>
-   <widget class="QMenu" name="menuPage">
-    <property name="title">
-     <string>Page</string>
-    </property>
-    <addaction name="separator"/>
-    <addaction name="actionImport_Data"/>
-    <addaction name="actionFile_Viewer"/>
-   </widget>
    <widget class="QMenu" name="menuPreferences">
     <property name="title">
      <string>Preferences</string>
@@ -89,21 +73,18 @@
      <addaction name="menuTheme"/>
      <addaction name="actionFont_Size"/>
     </widget>
-    <addaction name="actionReset_Default"/>
-    <addaction name="actionImport_Config"/>
+    <addaction name="actionReset_Preferences"/>
+    <addaction name="actionImport_Preferences"/>
     <addaction name="actionExport_Preferences"/>
     <addaction name="separator"/>
     <addaction name="menuAppearance"/>
    </widget>
-   <widget class="QMenu" name="menuImport">
+   <widget class="QMenu" name="menuFile">
     <property name="title">
-     <string>Import</string>
+     <string>File</string>
     </property>
-    <addaction name="actionImport_Data_Dialog"/>
    </widget>
-   <addaction name="menuImport"/>
-   <addaction name="temporary_menu"/>
-   <addaction name="menuPage"/>
+   <addaction name="menuFile"/>
    <addaction name="menuPreferences"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -142,12 +123,12 @@
     <string>Generate Groups</string>
    </property>
   </action>
-  <action name="actionReset_Default">
+  <action name="actionReset_Preferences">
    <property name="text">
     <string>Reset Default</string>
    </property>
   </action>
-  <action name="actionImport_Config">
+  <action name="actionImport_Preferences">
    <property name="text">
     <string>Import Preferences</string>
    </property>

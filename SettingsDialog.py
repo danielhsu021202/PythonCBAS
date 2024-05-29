@@ -10,10 +10,10 @@ from visualizations import Visualizer
 
 from ui.ProgressDialog import Ui_ProgressDialog
 
-from utils import TimeUtils, ReturnContainer
+from utils import TimeUtils
 from files import CBASFile
 
-from PyQt6.QtWidgets import QApplication, QDialog, QWidget, QMessageBox, QLabel, QProgressBar, QVBoxLayout, QHBoxLayout, QComboBox, QLineEdit, QMenu, QListWidgetItem, QTableWidgetItem
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QMessageBox, QHBoxLayout, QComboBox, QLineEdit, QMenu, QListWidgetItem, QTableWidgetItem
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QRegularExpression
 from PyQt6 import QtGui
 
@@ -21,6 +21,7 @@ from PyQt6 import QtGui
 import time
 import numpy as np
 import pandas as pd
+import threading
 
 class ProgressDialog(QDialog, Ui_ProgressDialog):
     """
@@ -38,8 +39,8 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
     This is specified by the worker to describe what the return value is.
     """
     def __init__(self, title: str, progress_max: int, 
-                 worker: QThread, worker_function, retrieval_function, 
-                 start_signal: pyqtSignal, running_signal: pyqtSignal, end_signal: pyqtSignal, 
+                 worker: QThread, worker_function, retrieval_function,
+                 start_signal: pyqtSignal, running_signal: pyqtSignal, end_signal: pyqtSignal,
                  parent=None):
         super(ProgressDialog, self).__init__(parent)
         self.setupUi(self)
@@ -50,11 +51,10 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         self.display_percent = False
         
         # UI Setup
-        self.resize(300, 200)
+        self.resize(325, 150)
 
         self.setWindowTitle(title)
 
-        self.cancelButton.clicked.connect(self.cancel)
 
         self.timeElapsed.setText("Time elapsed: 0.00 seconds")
 
@@ -122,17 +122,6 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         """Run the dialog and return the return value from the worker thread."""
         self.running_thread.start()
         self.exec()
-        return self.returnValue
-    
-    def cancel(self):
-        """Cancel the running process."""
-        try:
-            self.running_thread.quit()
-            self.running_thread.wait()
-        except Exception as e:
-            pass
-        self.close()
-        self.returnValue = None
         return self.returnValue
 
 
@@ -261,6 +250,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             assert type(self.parent_obj) == Counts
             self.setupResampleSettings()
 
+        self.cancelButton.clicked.connect(self.close)
+
         self.scanned_criterion_matrix = None
             
         self.returnValue = None
@@ -381,8 +372,10 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                             processor.start_processing_signal, processor.processing_progress_signal, processor.seq_cnts_complete_signal, self)
         progress_dialog.displayPercentage()
         counts_dir = progress_dialog.run()
-
-        self.createCounts(counts_dir, criterion, counts_language)
+        if counts_dir is not None:
+            self.createCounts(counts_dir, criterion, counts_language)
+        
+        QMessageBox.information(self, "Counts", "Sequence counts have been calculated and saved to the counts directory.")
         
         
     def createCounts(self, counts_dir, criterion, counts_language):
@@ -433,6 +426,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.createButton.clicked.connect(self.runResamples)
         self.fdpRadio.toggled.connect(self.errorCorrectionSettingToggled)
         self.fwerRadio.toggled.connect(self.errorCorrectionSettingToggled)
+
+        self.errorCorrectionSettingToggled()
 
     def useAllContingenciesToggled(self):
         if self.useAllContingenciesCheck.isChecked():
@@ -502,6 +497,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         if float(self.gammaLineEdit.text()) > 1.0:
             QMessageBox.critical(self, "Input Error", "Gamma must be between 0 and 1.")
             return
+        
+        QMessageBox.information(self, "Resampling", """Resampling is a computationally intensive process.\nIt is recommended to run this on a machine with multiple cores and a lot of memory.\nThe process may take a long time to complete. Progress indicator has not been implemented, so trust that it's running!\nPress OK to continue.""")
 
         # Create the Resamples object
         conts = [int(cont) for cont in self.contingenciesLineEdit.text().split(",")]
@@ -530,22 +527,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                 return
             resampler.setGroups(self.orig_groups, self.all_animals)
             running_process = lambda: resampler.generateResampledMatrix(correlational=False, num_resamples=num_resamples)
-
-        # We seem to be having an issue with the multithreading using QThread interfering with multiprocessing, so for now run without the progress dialog
+        
         running_process()
         resampled_matrix = resampler.getResampledMatrix()
-
-        # progress_dialog = ProgressDialog("Resampling", num_resamples,
-        #                                 resampler, running_process, resampler.getResampledMatrix,
-        #                                 resampler.resample_start_signal, resampler.resample_progress_signal, resampler.resample_end_signal, self)
-        # progress_dialog.displayPercentage()
-        # resampled_matrix = progress_dialog.run()
-        
-        # p_values = stats_analyzer.getPValuesFullParallel(k=2, alpha=0.05)
-        # print(p_values)
-        # print("P-values calculated. Time taken: ", format_time(time.time() - section_start))
-        # sys.exit()
-
 
         stats_analyzer = StatisticalAnalyzer(resampled_matrix)
         stats_analyzer.setParams(alpha, gamma)
@@ -570,16 +554,6 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                             stats_analyzer.start_signal, stats_analyzer.progress_signal, stats_analyzer.end_signal, self)
         progress_dialog.displayPercentage()
         p_values, k = progress_dialog.run()
-                                         
-        
-        
-
-
-
-        # p_values, k = stats_analyzer.fdpControl(alpha=0.5, gamma=0.05, abbreviated=False)
-        
-        print(f"Stopped at k={k}")
-        print(f"Number of significant sequences: {len(p_values)}")
         
         counts_dir = self.parent_obj.getDir()
         p_val_mat = []
@@ -594,7 +568,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                              self.orig_groups if not self.useCorrelationalCheckBox.isChecked() else None, 
                              alpha, gamma)
         
-        
+        QMessageBox.information(self, "Resampling", "Resampling and P-Value analysis complete!\nSignificant sequences have been saved to the resample directory.")
+    
 
 
     def createResamples(self, directory, custom_seed, num_resamples, contingencies, groups, alpha, gamma):
@@ -615,22 +590,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.returnValue = resamples
         self.close()
 
-
-
     def run(self):
         self.exec()
         return self.returnValue
-    
-
-
-if __name__ == "__main__":
-    import sys
-    app = QApplication(sys.argv)
-
-    # Spawn a group selector dialog
-    dialog = GroupSelectorDialog(["Genotype", "Sex", "Lesion", "Implant"])
-    dialog.run()
-    
-    sys.exit(app.exec())
     
     

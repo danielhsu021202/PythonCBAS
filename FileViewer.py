@@ -1,11 +1,9 @@
 
-from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem, QMenu, QTableWidgetItem, QAbstractItemView, QMessageBox
+from PyQt6.QtWidgets import QTableView, QWidget, QFileDialog, QTreeWidgetItem, QMenu, QTableWidgetItem, QMessageBox
 from PyQt6.QtGui import QIcon, QCursor
 from PyQt6.QtCore import QAbstractTableModel, Qt
 
 import os
-import sys
-import re
 import pandas as pd
 from statistics import median, mode
 
@@ -348,16 +346,9 @@ class FileViewer(QWidget, Ui_FileViewer):
         elif filename.startswith("seqRates"):
             return "seqRates"
         
-    # def getColumnNames(self, filepath, df):
-    #     """Returns the column names of the file at the given path."""
-    #     filetype = self.fileType(filepath)
-    #     if filetype == "animals":
-    #         return ["Animal Number", "Cohort Number", "Animal Key", "Genotype", "Sex", "Lesion", "Implant"]
-    #     elif filetype == "allSeqAllAn":
-    #         return ["Animal Number", "Trial Number", "Sequence Number"]
-    #     elif filetype == "seqRates":
-    #         return ["Original Seq No.", "Group 1 Mean", "Group 1 Var", "N1", "Group 2 Mean", "Group 2 Var", "N2", "Cont", "Len", "STS 1", "STS 2"]
-    #     else: return [str(i) for i in range(len(df.columns))]
+    def getColumnNames(self):
+        """Returns the column names of the file at the given path."""
+        return self.currentPDTable().getDF().columns.tolist()
 
     def fileTreeItemTriggered(self, item):
         """Called when a file is double clicked in the file tree. Opens the file in the table view."""
@@ -388,6 +379,7 @@ class FileViewer(QWidget, Ui_FileViewer):
                 QMessageBox.critical(self, "Opening file", "File is not tabular in nature.")
                 return
             # df.columns = self.getColumnNames(filepath, df)
+            df.columns = [f"c{i}" for i in range(df.shape[1])]
             pd_table = PandasTable(df, self)
             
         elif filepath.endswith(".cbas"):
@@ -450,10 +442,15 @@ class FileViewer(QWidget, Ui_FileViewer):
         self.filterTable.setItem(idx, 0, QTableWidgetItem(str(stage)))
         self.filterTable.item(idx, 0).setData(Qt.ItemDataRole.UserRole, stage)
 
-        
+    def sendToParser(self, stage_tuple):
+        try:
+            return PipelineDialog.parseStage(stage_tuple, self.getColumnNames(), self)
+        except Exception as e:
+            QMessageBox.critical(self, "Error during Filtering", f"An error occurred during filtering: {str(e)}")
+            return None, ""
 
     def applyStageNow(self, stage_tuple):
-        query, message = PipelineDialog.parseStage(stage_tuple, self.getColumnNames(self.currentFile(), self.currentPDTableDF()), self)
+        query, message = self.sendToParser(stage_tuple)
         if query is None:
             return
         if self.currentPDTable():
@@ -467,7 +464,7 @@ class FileViewer(QWidget, Ui_FileViewer):
             return
         queries_and_messages = []
         for i in range(self.filterTable.rowCount()):
-            query, message = PipelineDialog.parseStage(self.filterTable.item(i, 0).data(Qt.ItemDataRole.UserRole), self.getColumnNames(self.currentFile(), self.currentPDTableDF()), self)
+            query, message = self.sendToParser(self.filterTable.item(i, 0).data(Qt.ItemDataRole.UserRole))
             if query is None:
                 return
             queries_and_messages.append(query)

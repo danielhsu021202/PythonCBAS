@@ -1,7 +1,4 @@
 import numpy as np
-import multiprocessing as mp
-from files import CBASFile
-import os, sys
 from time import time
 
 from PyQt6.QtCore import QThread, pyqtSignal

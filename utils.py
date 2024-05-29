@@ -2,34 +2,13 @@ import numpy as np
 import re
 import os
 import shutil
-import uuid
 import pickle
 import json
 import gzip
 import datetime
 import subprocess
 import requests
-import webbrowser
 from scipy.sparse import csr_matrix
-
-class ReturnContainer:
-    def __init__(self, value=None):
-        self.value = value
-
-    def set(self, value):
-        self.value = value
-
-    def get(self):
-        return self.value
-
-class HexUtils:
-
-    def numHexDigits(num: int):
-        return len(hex(num)) - 2
-    
-    def genUUID():
-        return uuid.uuid4().hex
-    
 
 class StringUtils:
     
@@ -132,7 +111,10 @@ class FileUtils:
         
     def deleteFolder(folder):
         """Deletes a folder and all its contents."""
-        shutil.rmtree(folder)
+        try:
+            shutil.rmtree(folder)
+        except:
+            pass
 
             
 class MatrixUtils:

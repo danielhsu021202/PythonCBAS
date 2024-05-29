@@ -1,18 +1,7 @@
 # Imports
 import os
-import sys
 import shutil
-import timeit
-import pickle
-import pandas as pd
 import numpy as np
-from numpy.lib.stride_tricks import as_strided
-import re
-import csv
-import time
-
-
-from random import randint
 
 from files import CBASFile
 from settings import Settings, CONSTANTS

@@ -1,10 +1,8 @@
 from PyQt6 import QtCore, QtGui
-from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout, QMenu, QMessageBox, QMainWindow
+from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout, QMenu, QMessageBox
 
 from ui.Card_ui import Ui_Card
 from settings import DataSet, Counts, Resamples, next_type
-
-from FileViewer import FileViewer
 
 from utils import StringUtils
 

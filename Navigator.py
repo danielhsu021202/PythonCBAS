@@ -8,7 +8,7 @@ from FileViewer import FileViewer
 
 from utils import StringUtils
 
-from PyQt6.QtWidgets import QWidget, QMainWindow, QApplication, QMessageBox
+from PyQt6.QtWidgets import QWidget, QMainWindow, QApplication, QMessageBox, QPushButton, QLabel, QHBoxLayout
 from PyQt6 import QtCore
 
 class Navigator(QWidget, Ui_NavigatorFrame):
@@ -74,6 +74,19 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         # Update the path label
         path = [obj.getName() for obj in self.obj.retracePath()]
         self.pathLabel.setText("  >  ".join(path))
+        # self.buildPath(obj)
+
+    def buildPath(self, obj):
+        if self.pathWidget.layout() is not None:
+            self.pathWidget.layout().deleteLater()
+        path = [obj.getName() for obj in obj.retracePath()]
+        layout = QHBoxLayout()
+        for item in path:
+            layout.addWidget(QPushButton(item))
+        self.pathWidget.setLayout(layout)
+
+
+
 
     def setAddItemButton(self, card: Card):
         if self.mode == "dataset":

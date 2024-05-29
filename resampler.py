@@ -4,38 +4,12 @@ import threading
 from random import choices, seed
 import pandas as pd
 from settings import Settings, CONSTANTS
-from utils import FileUtils
 from files import CBASFile
 import numpy as np
 import multiprocessing
 from scipy.stats import pearsonr
 
-from PyQt6.QtCore import QThread, pyqtSignal, QObject
-
-class ResamplerThread(threading.Thread):
-    def __init__(self, resampler):
-        super(ResamplerThread, self).__init__()
-        self.resampler = resampler
-        self.resampler.resample_start_signal.connect(self.resampler_start)
-        self.resampler.resample_progress_signal.connect(self.resampler_progress)
-        self.resampler.resample_end_signal.connect(self.resampler_end)
-    
-    def run(self):
-        self.resampler.generateResampledMatrix()
-
-    def resampler_start(self):
-        print("Resampling started")
-    
-    def resampler_progress(self, progress):
-        print(f"Resampling progress: {progress[0]} {progress[1]}")
-    
-    def resampler_end(self):
-        print("Resampling ended")
-
-class Resampler(QObject):
-    resample_start_signal = pyqtSignal()
-    resample_progress_signal = pyqtSignal(tuple)
-    resample_end_signal = pyqtSignal()
+class Resampler:
     def __init__(self, name, counts_dir, max_seq_len: int, conts: list, custom_seed=925):
         super(Resampler, self).__init__()
 
@@ -331,6 +305,7 @@ class Resampler(QObject):
     def resampleCorrelation(self, id=0):
         """performs one resampling of the covariates."""
         # Resample the covariates
+        # self.resample_progress_signal.emit((id, "Resampling..."))
         resampled_covariates = self.resampleCovariates(id)
         # Calculate the studentized test statistics for the resampled covariates
         return self.getStudentizedTestStatsCorrelationalPD(resampled_covariates)
@@ -353,8 +328,8 @@ class Resampler(QObject):
         else:
             reference_studentized_test_stats = self.getStudentizedTestStatsComparisonPD(self.orig_groups)
 
-        self.resample_start_signal.emit()
-        self.resample_progress_signal.emit((0, "Resampling..."))
+        # self.resample_start_signal.emit()
+        # self.resample_progress_signal.emit((0, "Resampling..."))
         # Create a pool of worker processes
         pool = multiprocessing.Pool()
         # Run self.sample() and append the result to resampled_matrix at the specified index
@@ -374,7 +349,7 @@ class Resampler(QObject):
         pool.close()
         pool.join()
 
-        self.resample_end_signal.emit()
+        # self.resample_end_signal.emit()
         # return resampled_matrix
 
 

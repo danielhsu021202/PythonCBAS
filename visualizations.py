@@ -1,5 +1,6 @@
 import os
-qtwebengine_dictionaries_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qtwebengine_dictionaries")
+from settings import Settings
+qtwebengine_dictionaries_path = os.path.join(Settings.getAppDataFolder(), "qtwebengine_dictionaries")
 if not os.path.exists(qtwebengine_dictionaries_path):
     os.mkdir(qtwebengine_dictionaries_path)
 os.environ["QTWEBENGINE_DICTIONARIES_PATH"] = qtwebengine_dictionaries_path
@@ -8,7 +9,7 @@ import sys
 
 from ui.UI_VisualizerWindow import Ui_VisualizerWindow
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QToolBox, QFileDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QFileDialog, QMessageBox
 
 import plotly.figure_factory as ff
 import plotly.express as px
@@ -81,6 +82,9 @@ class Visualizer:
         
 
     def showWindow(self):
+        if not WebUtils.check_internet_connection():
+            QMessageBox.critical(self.parent, "No Internet Connection", "Currently, internet connection is required for generating and viewing plots.")
+            return
         VisualizerWindow(self.name, self.visualizations, self.parent).exec()
 
     

@@ -1,7 +1,7 @@
 import os
 from utils import FileUtils, StringUtils
-import uuid
 import json
+import platform
 import datetime
 
 next_type = {
@@ -37,6 +37,21 @@ class Settings:
     """
     def __init__(self):
         pass
+
+    def getAppDataFolder():
+        if platform.system() == "Windows":
+            return os.path.join(os.getenv('APPDATA'), "PythonCBAS")
+        elif platform.system() == "Darwin":
+            return os.path.join(os.getenv('HOME'), "Library", "Application Support", "PythonCBAS")
+        
+    def getDocumentsFolder():
+        try:
+            if platform.system() == "Windows":
+                return os.path.join(os.getenv('USERPROFILE'), "Documents")
+            elif platform.system() == "Darwin":
+                return os.path.join(os.getenv('HOME'), "Documents")
+        except:
+            return os.path.expanduser("~")
     
     def getAnimalInfoFormat(self):
         return self.animal_info_format
@@ -93,6 +108,7 @@ class Settings:
         }
 
 
+
     
     def setLanguage(num_choices, modifier_ranges):
         """Sets the language for the experiment. The language is defined by the number of choices and the number of modifiers."""
@@ -104,6 +120,8 @@ class Settings:
         """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
         assert attr_dict.keys() == self.criterion.keys()
         self.criterion = attr_dict
+
+    
 
 
 
@@ -359,17 +377,6 @@ class Resamples:
         self.pvaluesettings = None  # [PVALUE]
     
     def readResamples(self, resamples):
-        # try:
-        #     pvalues = resamples["pvalues"]
-        # except KeyError:
-        #     raise KeyError("Error reading in the resamples.")
-        
-        # for pvalue in pvalues:
-        #     pvalue_obj = Pvalues()
-        #     pvalue_obj.readPvalues(pvalue)
-        #     pvalue_obj.setParent(self)
-        #     self.pvalues.append(pvalue_obj)
-        
         self.resample_settings = resamples["resample_settings"]
         self.pvaluesettings = resamples["pvalue_settings"]  # [PVALUE]
 
@@ -379,7 +386,6 @@ class Resamples:
             "type": "resamples",
             "resample_settings": self.getResampleSettings(),
             "pvalue_settings": self.getPValueSettings(),
-            # "pvalues": [pvalue.exportPvalues() for pvalue in self.pvalues]
         }
         return resamples
     
@@ -436,54 +442,6 @@ class Resamples:
     ### SETTER FUNCTIONS ###
     def setParent(self, parent:Counts): self.parent = parent
 
-    
-    
-
-
-# class Pvalues:
-#     def __init__(self, ):
-#         self.visualizations = []
-#         self.pvaluesettings = None
-    
-#     def readPvalues(self, pvalues):
-#         try:
-#             visualizations = pvalues["visualizations"]
-#         except KeyError:
-#             raise KeyError("Error reading in the pvalues.")
-        
-#         for visualization in visualizations:
-#             visualization_obj = Visualizations()
-#             visualization_obj.readVisualizations(visualization)
-
-#             self.visualization_obj.setParent(self)
-#             self.visualizations.append(visualization_obj)
-
-#     def exportPvalues(self):
-#         """Generate the dictionary for a pvalues object."""
-#         pvalues = {
-#             "type": "pvalues",
-#             "pvaluesettings": self.getPvaluesSettings(),
-#             "visualizations": [visualization.exportVisualizations() for visualization in self.visualizations]
-#         }
-#         return pvalues
-    
-#     ### GETTER FUNCTIONS ###
-#     def getType(self) -> str: return "pvalues"
-#     def getPvaluesSettings(self) -> dict: return self.pvaluesettings
-#     def useFDP(self) -> bool: return self.pvaluesettings["fdp"]
-#     def getAlpha(self) -> float: return self.pvaluesettings["alpha"]
-#     def getGamma(self) -> float: return self.pvaluesettings["gamma"]
-#     def getChildren(self) -> list: return self.visualizations
-#     def getParent(self) -> Resamples: return self.parent
-
-#     ### SETTER FUNCTIONS ###
-#     def setParent(self, parent:Resamples): self.parent = parent
-
-    
-#     def addVisualizationsObj(self, visualization_obj):
-#         visualization_obj.setParent(self)
-#         self.visualizations.append(visualization_obj)
-
 
 class Visualizations:
     def __init__(self, ):
@@ -511,6 +469,15 @@ class Preferences:
     def __init__(self, preferences_filepath):
         self.preferences_filepath = preferences_filepath
         self.recentlyOpened = set()
+
+        if not os.path.exists(preferences_filepath):
+            self.writePreferences()
+        else:
+            try:
+                self.readPreferences(preferences_filepath)
+            except:
+                self.resetPreferences()
+                self.writePreferences()
     
     def readPreferences(self, filepath):
         with open(filepath, 'r') as f:
@@ -521,7 +488,7 @@ class Preferences:
         except KeyError:
             raise KeyError("Problem importing preferences.")
         
-    def exportPreferences(self):
+    def genPreferenceDict(self):
         """Generate the dictionary for a preferences object."""
         preferences = {
             "recentlyOpened": list(self.recentlyOpened)
@@ -530,14 +497,30 @@ class Preferences:
     
     def writePreferences(self):
         with open(self.preferences_filepath, 'w') as f:
-            json.dump(self.exportPreferences(), f)
+            json.dump(self.genPreferenceDict(), f)
 
     def addRecentlyOpened(self, filepath):
         self.recentlyOpened.add(filepath)
         self.writePreferences()
 
+    def removeRecentlyOpened(self, filepath):
+        self.recentlyOpened.remove(filepath)
+        self.writePreferences()
+
     def getRecentlyOpened(self):
         return self.recentlyOpened
+    
+    def exportPreferences(self, filepath):
+        with open(filepath, 'w') as f:
+            json.dump(self.genPreferenceDict(), f)
+
+    def importPreferences(self, filepath):
+        self.readPreferences(filepath)
+        self.writePreferences()
+
+    def resetPreferences(self):
+        self.recentlyOpened = set()
+        self.writePreferences()
 
 
 
