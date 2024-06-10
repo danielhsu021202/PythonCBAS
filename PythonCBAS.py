@@ -1,7 +1,12 @@
 from settings import Settings
+import os
+import shutil
+
+# Create app data folder if it doesn't exist
+if not os.path.exists(Settings.getAppDataFolder()): os.mkdir(Settings.getAppDataFolder())
 
 import sys
-import os
+
 import datetime
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox, QDialog, QTableWidgetItem, QTableWidget, QMenu
@@ -87,13 +92,32 @@ class Lobby(QDialog, Ui_Lobby):
         self.returnValue = project
         self.close()
 
+    def deleteProject(self, filepath):
+        """Delete a project file."""
+        # Remove the directory containing the project
+        parent_folder = os.path.dirname(filepath)
+        # Make sure the name of the folder is the same as the project name
+        folder_name = os.path.basename(parent_folder)
+        assert folder_name == os.path.splitext(os.path.basename(filepath))[0]
+        shutil.rmtree(parent_folder)
+        self.setupRecentlyOpened()
+
     def loadProject(self, filepath):
         """Load a project from a .json or .cbasproj file."""
-        project = Project()
-        project.readProject(filepath)
-        self.preferences.addRecentlyOpened(project.getFilepath())
-        self.returnValue = project
-        self.close()
+        try:
+            project = Project()
+            project.readProject(filepath)
+            self.preferences.addRecentlyOpened(project.getFilepath())
+            self.returnValue = project
+            self.close()
+        except Exception as e:
+            reply = QMessageBox.critical(self, "Error Loading Project", f"An error occurred while loading the project:\n{e}.\n Would you like to delete this project?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self.deleteProject(filepath)
+            self.returnValue = None
+
+    
+        
 
     def setupRecentlyOpened(self):
         self.recentlyOpenedTable.setRowCount(0)
@@ -105,6 +129,7 @@ class Lobby(QDialog, Ui_Lobby):
         self.recentlyOpenedTable.setHorizontalHeaderLabels(["Project", "Last Modified"])
 
         recently_opened = list(self.preferences.getRecentlyOpened())
+        recently_opened = [f for f in recently_opened if os.path.exists(f)]
         recently_opened.sort(key=lambda x: os.path.getmtime(x), reverse=True)
         for i, filepath in enumerate(recently_opened):
             self.recentlyOpenedTable.insertRow(i)
@@ -124,12 +149,18 @@ class Lobby(QDialog, Ui_Lobby):
         menu = QMenu()
         openAction = menu.addAction("Open")
         removeAction = menu.addAction("Remove")
+        deleteAction = menu.addAction("Delete")
         action = menu.exec(self.recentlyOpenedTable.viewport().mapToGlobal(pos))
         if action == openAction:
             self.loadProject(self.recentlyOpenedTable.itemAt(pos).data(Qt.ItemDataRole.UserRole))
         elif action == removeAction:
             self.preferences.removeRecentlyOpened(self.recentlyOpenedTable.itemAt(pos).data(Qt.ItemDataRole.UserRole))
             self.setupRecentlyOpened()
+        elif action == deleteAction:
+            reply = QMessageBox.question(self, "Delete Project", "Are you sure you want to delete this project?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                filepath = self.recentlyOpenedTable.itemAt(pos).data(Qt.ItemDataRole.UserRole)
+                self.deleteProject(filepath)
                               
 
 
