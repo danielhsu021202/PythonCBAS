@@ -111,7 +111,7 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array([[num for num in sequence] for sequence in self.seq_nums.keys()])
-        cbas_file = CBASFile(f'allSeq_{cont}_{seq_len}', mat, )
+        cbas_file = CBASFile(f'allSeq_{cont}_{seq_len}', mat, type=CBASFile.file_types['ALLSEQ'])
         cbas_file.saveFile(dir)
         # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQDIR'], f'allSeq_{cont}_{seq_len}.txt'), mat)
     
@@ -121,7 +121,7 @@ class SequenceManager:
         """
         # Turn into a 2D array
         mat = np.array(self.animal_trials)
-        cbas_file = CBASFile(f'allSeqAllAn_{cont}_{seq_len}', mat, col_headers=['Subject No.', 'Trial No.', 'Seq No.'])
+        cbas_file = CBASFile(f'allSeqAllAn_{cont}_{seq_len}', mat, type=CBASFile.file_types['ALLSEQALLAN'])
         cbas_file.saveFile(dir)
         # FileUtils.writeMatrix(os.path.join(FILES['ALLSEQALLANDIR'], f'allSeqAllAn_{cont}_{seq_len}.txt'), mat)
 
@@ -130,8 +130,8 @@ class SequenceManager:
         Generate the seqCnts file for this sequence length and contingency.
         """
         name = f'seqCnts_{cont}_{seq_len}'
-        cbasFile = CBASFile(name, self.seq_counts.astype(int))
-        cbasFile.saveFile(dir, use_sparsity_csr=True, dtype=int)
+        cbasFile = CBASFile(name, self.seq_counts.astype(int), type=CBASFile.file_types['SEQCNTS'])
+        cbasFile.saveFile(dir, dtype=int, use_sparsity_csr=True)
         # FileUtils.writeMatrix(os.path.join(FILES['SEQCNTSDIR'], f'seqCnts_{cont}_{seq_len}.txt'), self.seq_counts)
     
     def numUniqueSeqs(self):

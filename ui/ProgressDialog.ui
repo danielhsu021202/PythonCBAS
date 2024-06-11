@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>394</width>
-    <height>172</height>
+    <height>166</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -30,6 +30,13 @@
    </item>
    <item>
     <widget class="QLabel" name="timeElapsed">
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="estimatedTimeLabel">
      <property name="text">
       <string>TextLabel</string>
      </property>

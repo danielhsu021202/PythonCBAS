@@ -78,7 +78,6 @@ class Resampler:
             # Each element in the group is a filter
             for col_name, value in filter.items():
                 col_num = aninfocolumns.index(col_name) + 2  # +2 because the first two columns of animal matrix are animal number and cohort number
-                print(col_name, col_num)
                 animal_matrix_copy = animal_matrix_copy[animal_matrix_copy[:,col_num] == value]
             orig_groups.append(list(animal_matrix_copy[:,0]))
         all_animals = [animal for group in orig_groups for animal in group]
@@ -321,10 +320,10 @@ class Resampler:
         reference_studentized_test_stats = None
         if correlational:
             reference_studentized_test_stats = self.getStudentizedTestStatsCorrelationalPD(self.orig_covariates)
-            print(len(self.orig_covariates))
-            print(self.orig_covariates)
+            # print(len(self.orig_covariates))
+            # print(self.orig_covariates)
             positives = [val for val in reference_studentized_test_stats if val > 0]
-            print(sum(positives))
+            # print(sum(positives))
         else:
             reference_studentized_test_stats = self.getStudentizedTestStatsComparisonPD(self.orig_groups)
 
@@ -340,9 +339,7 @@ class Resampler:
             results = pool.map(self.resampleCorrelation, np.arange(1, num_resamples+1))
         else:
             results = pool.map(self.resampleComparison, np.arange(1, num_resamples+1))
-        print("resampling")
         for i, result in enumerate(results):
-            print(i)
             self.resampled_matrix[i+1] = result
             results[i] = None  # Remove the row from the results to free up memory
         # Close the pool and wait for all processes to finish

@@ -25,8 +25,8 @@ prev_type = {
 }
 
 CONSTANTS = {
-    "NaN": None,
-    "inf": float("inf"),
+    "NaN": -1,
+    "inf": -2,
 }
 
 

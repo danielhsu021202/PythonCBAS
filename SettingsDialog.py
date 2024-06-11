@@ -46,9 +46,16 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         self.setupUi(self)
 
         self.progress_max = progress_max
+        self.percentage = 0
         self.returnValue = None
         self.worker = worker
         self.display_percent = False
+
+        # Time Tracking
+        self.percentage_gain_last_period = -1
+        self.last_logged_time = time.time()
+        self.time_for_last_update = -1
+        self.estimatedTimeLabel.hide()
         
         # UI Setup
         self.resize(325, 150)
@@ -72,6 +79,7 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         self.timer = QTimer()
         self.startTime = None
         self.timer.timeout.connect(self.updateTimeElapsed)
+        # self.timer.timeout.connect(self.updateEstimatedTimeLeft)
         self.timer.start(1000)  # Update every second
 
     def displayPercentage(self):
@@ -95,11 +103,16 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         Called when the worker thread emits a running signal.
         Update the progress bar with the given value and label.
         """
+        self.time_for_last_update = time.time() - self.last_logged_time
+        self.last_logged_time = time.time()
+        self.percentage_gain_last_period = progress[0] - self.percentage
+
+
         value, progress_label = progress
-        percentage = value / self.progress_max * 100
-        self.progressBar.setValue(int(percentage))
+        self.percentage = value / self.progress_max * 100
+        self.progressBar.setValue(int(self.percentage))
         if self.display_percent:
-            self.progressLabel.setText(f"{percentage:.2f}%")
+            self.progressLabel.setText(f"{self.percentage:.2f}%")
         else:
             self.progressBar.setFormat(f"{value} / {self.progress_max}")
         self.progressLabel.setText(progress_label)
@@ -108,6 +121,22 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         if self.startTime is not None:
             elapsed_time = time.time() - self.startTime
             self.timeElapsed.setText(f"Time elapsed: {TimeUtils.format_time(elapsed_time)}")
+
+    def updateEstimatedTimeLeft(self):
+        """
+        Update the estimated time left based on the current progress.
+        This is calculated as a proportion of the percent remaining, related to the time it took for the previous update.
+        """
+        # TODO: Implement this algorithm
+        if self.time_for_last_update == -1:
+            self.estimatedTimeLabel.setText("Estimated time left: Calculating...")
+            return
+        time_this_period = time.time() - self.last_logged_time
+        time_needed_per_percentage_point = self.time_for_last_update / self.percentage_gain_last_period
+        time_remaining = (100 - self.percentage) * time_needed_per_percentage_point - time_this_period
+        self.estimatedTimeLabel.setText(f"Estimated time left: {TimeUtils.format_time(time_remaining)}")
+
+
 
     def end(self, return_value):
         """
@@ -217,7 +246,6 @@ class GroupSelectorDialog(QDialog, Ui_GroupSelectorDialog):
                 return
             group2[key] = int(value)
         filters = [group1, group2]
-        print(filters)
         orig_groups, all_animals = Resampler.assignGroups(self.all_animals_matrix_path, self.aninfocolumns, filters)
         self.returnValue = (filters, orig_groups, all_animals)
         if len(all_animals) != len(set(all_animals)):
@@ -550,19 +578,14 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             worker_function = stats_analyzer.fdpControl
 
         progress_dialog = ProgressDialog("Calculating p-values", 100,
-                                         stats_analyzer, worker_function, stats_analyzer.getPValueResults,
+                                            stats_analyzer, worker_function, stats_analyzer.getPValueResults,
                                             stats_analyzer.start_signal, stats_analyzer.progress_signal, stats_analyzer.end_signal, self)
         progress_dialog.displayPercentage()
         p_values, k = progress_dialog.run()
         
         counts_dir = self.parent_obj.getDir()
-        p_val_mat = []
-        for p_val, seq_num, positively_correlated in p_values:
-            seq, cont, length, local_num = SequencesProcessor.getSequence(seq_num, seq_num_index, counts_dir)
-            p_val_mat.append([p_val, seq, cont, length, local_num, positively_correlated])
-        p_val_mat = np.array(p_val_mat, dtype=object)
-        p_val_file = CBASFile("significant_sequences", p_val_mat, col_headers=['P-Value', 'Sequence', 'Contingency', 'Length', 'Local Seq. No.', 'Positively Correlated'])
-        p_val_file.saveFile(resample_dir)
+        
+        stats_analyzer.writeSigSeqFile(p_values, seq_num_index, counts_dir, resample_dir)
 
         self.createResamples(resample_dir, seed, num_resamples, contingencies, 
                              self.orig_groups if not self.useCorrelationalCheckBox.isChecked() else None, 

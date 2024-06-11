@@ -86,18 +86,6 @@ class Visualizer:
             QMessageBox.critical(self.parent, "No Internet Connection", "Currently, internet connection is required for generating and viewing plots.")
             return
         VisualizerWindow(self.name, self.visualizations, self.parent).exec()
-
-    
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = QMainWindow()
-    viz = Visualizer("Test", window)
-    viz.createScatterPlot([[1, 2, 3], [4, 5, 6], [7, 8, 9]], title="Test", xaxis_title="X", yaxis_title="Y")
-    viz.showWindow()
-
-    sys.exit(app.exec())
         
 
 

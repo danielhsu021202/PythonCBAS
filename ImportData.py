@@ -6,7 +6,7 @@ import sys
 import shutil
 import numpy as np
 
-from utils import ListUtils, FileUtils
+from utils import ListUtils, FileUtils, StringUtils
 from settings import Settings, DataSet
 
 from ui.ImportDataDialog import Ui_ImportDataDialog
@@ -563,8 +563,9 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         if "Choice" not in table_vals:
             QMessageBox.critical(self, "Error", "The 'Choice' column is missing and is required.")
             return
-        if "Session" not in table_vals or "Contingency" not in table_vals or "Modifier" not in table_vals:
-            QMessageBox.warning(self, "Warning", "No 'Session', 'Contingency', or 'Modifier' columns specified. These columns are optional. If not included, 'Session' and 'Contingency' will be considered 0 for all subjects.")
+        missing = [col for col in ["Session", "Contingency", "Modifier"] if col not in table_vals]
+        if missing:
+            QMessageBox.warning(self, "Warning", f"The columns {StringUtils.andSeparateList(missing)} are not specified. These columns are optional.\nIf not included, 'Session' and 'Contingency' will be considered 0 for all subjects.")
         
         # Append the column names to the list. Use the index if the column is not labeled
         for label in self.anDataTable.columns.values():
@@ -647,7 +648,7 @@ class ImportData(QDialog, Ui_ImportDataDialog):
                                                         and not name.startswith('.')])
             all_paths += [os.path.join(cohort_folder, file) for file in animal_files]
             animal_info_matrix = FileUtils.getMatrix(info_file, delimiter=self.delimiter, dtype=(
-                str if "Covariate" in self.anInfoColumns else int
+                float if "Covariate" in self.anInfoColumns else int
             ))
             # Get rid of hidden files
             animal_files = [file for file in animal_files if not file.startswith('.')]

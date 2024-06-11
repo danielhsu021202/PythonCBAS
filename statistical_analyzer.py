@@ -3,6 +3,9 @@ from time import time
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from files import CBASFile
+from sequences import SequencesProcessor
+
 class StatisticalAnalyzer(QThread):
     start_signal = pyqtSignal()
     progress_signal = pyqtSignal(tuple)
@@ -114,3 +117,12 @@ class StatisticalAnalyzer(QThread):
     
     def getPValueResults(self):
         return self.p_values, self.k
+    
+    def writeSigSeqFile(self, p_values, seq_num_index, counts_dir, resample_dir):
+        p_val_mat = []
+        for p_val, seq_num, positively_correlated in p_values:
+            seq, cont, length, local_num = SequencesProcessor.getSequence(seq_num, seq_num_index, counts_dir)
+            p_val_mat.append([p_val, seq, cont, length, local_num, positively_correlated])
+        # p_val_mat = np.array(p_val_mat, dtype=object)
+        p_val_file = CBASFile("significant_sequences", p_val_mat, type=CBASFile.file_types['SIGSEQS'])
+        p_val_file.saveFile(resample_dir)

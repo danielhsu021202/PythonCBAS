@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_ProgressDialog(object):
     def setupUi(self, ProgressDialog):
         ProgressDialog.setObjectName("ProgressDialog")
-        ProgressDialog.resize(394, 172)
+        ProgressDialog.resize(394, 166)
         self.verticalLayout = QtWidgets.QVBoxLayout(ProgressDialog)
         self.verticalLayout.setObjectName("verticalLayout")
         self.progressLabel = QtWidgets.QLabel(parent=ProgressDialog)
@@ -25,6 +25,9 @@ class Ui_ProgressDialog(object):
         self.timeElapsed = QtWidgets.QLabel(parent=ProgressDialog)
         self.timeElapsed.setObjectName("timeElapsed")
         self.verticalLayout.addWidget(self.timeElapsed)
+        self.estimatedTimeLabel = QtWidgets.QLabel(parent=ProgressDialog)
+        self.estimatedTimeLabel.setObjectName("estimatedTimeLabel")
+        self.verticalLayout.addWidget(self.estimatedTimeLabel)
 
         self.retranslateUi(ProgressDialog)
         QtCore.QMetaObject.connectSlotsByName(ProgressDialog)
@@ -34,3 +37,4 @@ class Ui_ProgressDialog(object):
         ProgressDialog.setWindowTitle(_translate("ProgressDialog", "Dialog"))
         self.progressLabel.setText(_translate("ProgressDialog", "TextLabel"))
         self.timeElapsed.setText(_translate("ProgressDialog", "TextLabel"))
+        self.estimatedTimeLabel.setText(_translate("ProgressDialog", "TextLabel"))

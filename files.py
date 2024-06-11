@@ -9,14 +9,26 @@ from PyQt6.QtWidgets import QMessageBox
 
 class CBASFile:
     file_types = {
-        'MATRIX': 0,
-        'DATAFRAME': 1,
-        'ALLSEQ': 2,
-        'ALLSEQALLAN': 3,
-        'SEQCNTS': 4,
-        'SEQRATES': 5,
-        'RESAMPLED': 6,
-        'SIGSEQS': 7,
+        'MATRIX': 'MATRIX',
+        'DATAFRAME': 'DATAFRAME',
+        'ALLSEQ': 'ALLSEQ',
+        'ALLSEQALLAN': 'ALLSEQALLAN',
+        'SEQCNTS': 'SEQCNTS',
+        'SEQRATES': 'SEQRATES',
+        'RESAMPLED': 'RESAMPLED',
+        'SIGSEQS': 'SIGSEQS',
+    }
+
+    headers = {
+        'MATRIX': None,
+        'DATAFRAME': None,
+        'ALLSEQ': None,
+        'ALLSEQALLAN': ['Subject No.', 'Trial No.', 'Seq No.'],
+        'SEQCNTS': None,
+        'SEQRATES': None,
+        'RESAMPLED': None,
+        'SIGSEQS': ['P-Value', 'Sequence', 'Contingency', 'Length', 'Local Seq. No.', 'Positively Correlated'],
+        
     }
 
     compression_formats = {
@@ -44,7 +56,9 @@ class CBASFile:
     
     def getColumnHeaders(self):
         if self.col_headers is None:
-            return [f"c{i}" for i in range(self.data.shape[1])]
+            if self.type is None or CBASFile.headers[self.type] is None:
+                return [f"c{i}" for i in range(self.data.shape[1])]
+            return CBASFile.headers[self.type]
         return self.col_headers
     
 

@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt
 
 from utils import ListUtils, FileUtils
 from files import CBASFile
+from settings import CONSTANTS
 
 class PandasTableModel(QAbstractTableModel): 
     def __init__(self, df=pd.DataFrame(), parent=None): 
@@ -47,6 +48,24 @@ class PandasTableModel(QAbstractTableModel):
             return None
 
         return str(self._df.iloc[index.row(), index.column()])
+    
+    def cast(self, value):
+        try:
+            if value.lower() == 'nan':
+                return None
+            if value.lower() in {'inf', '-inf'}:
+                return value
+            # Try to convert to int first
+            ivalue = int(value)
+            return ivalue
+        except ValueError:
+            try:
+                # If int conversion fails, try to convert to float
+                fvalue = float(value)
+                return fvalue
+            except ValueError:
+                # If both conversions fail, return the value as is
+                return value
 
     def setData(self, index, value, role):
         row = self._df.index[index.row()]
@@ -202,7 +221,8 @@ class PandasTable(QTableView):
 
     def countNaN(self):
         """Counts the number of NaN values in the table."""
-        self.parent.functionTerminal.appendPlainText("NaNs: " + str(self.df.isnull().sum().sum()))
+        # Count all that are Settings.CONSTANTS['NaN']
+        self.parent.functionTerminal.appendPlainText("NaNs: " + str((self.df == CONSTANTS['NaN']).sum().sum()) if self.df is not None else "No file selected.")
     
     def updateTable(self, df=None):
         if df is not None:
@@ -357,8 +377,7 @@ class FileViewer(QWidget, Ui_FileViewer):
             try:
                 self.openFile(filepath)
             except Exception as e:
-                QMessageBox.critical(self, "File Error", f"""Couldn't open {os.path.basename(filepath)}.\n
-                                                            Details: {e}""")
+                QMessageBox.critical(self, "File Error", f"Couldn't open {os.path.basename(filepath)}.\nDetails: {e}")
                 return
         else:
             # Switch to the tab whose filepath matches the selected file
