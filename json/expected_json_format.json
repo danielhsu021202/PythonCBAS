@@ -1,0 +1,82 @@
+{
+    "project": {
+        "type": "project",
+        "project_attr": {
+            "name": "<default_string>",
+            "description": "<default_string>",
+            "datecreated": "<default_string>",
+            "datemodified": "<default_string>",
+            "dir": "<default_string>",
+            "version": "<default_string>"
+        },
+        "datasets": []
+    },
+    "dataset": {
+        "type": "dataset",
+        "dataset_settings": {
+            "name": "<default_string>",
+            "description": "<default_string>",
+            "dir": "<default_string>",
+            "aninfoname": "<default_string>",
+            "anInfoColumnNames": "<default_list>",
+            "anDataColumns": "<default_dict>",
+            "correlational_possible": "<default_bool>",
+            "language": "<default_dict>",
+            "num_animals": "int",
+            "cohort_file": "<default_string>",
+            "all_animals_file": "<default_string>",
+            "all_paths_file": "<default_string>"
+        },
+        "counts": []
+    },
+    "counts": {
+        "type": "counts",
+        "counts_settings": {
+            "name": "<default_string>",
+            "dir": "<default_string>",
+            "description": "<default_string>",
+            "criterion": "<default_dict>",
+            "counts_language": "<default_dict>"
+        },
+        "counts_metadata": {
+            "time_taken": null
+        },
+        "resamples": []
+
+    },
+    "resamples": {
+        "type": "resamples",
+        "resample_settings": {
+            "name": "<default_string>",
+            "description": "<default_string>",
+            "dir": "<default_string>",
+            "correlational": "<default_bool>",
+            "seed": "<default_int>",
+            "numresamples": "<default_int>",
+            "contingencies": "<default_list>",
+            "groups": "<default_list>"
+        },
+        "pvalue_settings": {
+            "fdp": "<default_bool>",
+            "alpha": "<default_float>",
+            "gamma": "<default_float>"
+        },
+        "resamples_metadata": {
+            "time_taken": null
+        },
+        "pvalues_metadata": {
+            "time_taken": null
+        }
+
+    },
+    "visualizations": {
+        "type": "visualizations",
+        "visualization_settings": {
+            
+        }
+        
+    },
+    "preferences": {
+        "recentlyOpened": []
+    }
+}
