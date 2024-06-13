@@ -8,6 +8,7 @@ import gzip
 import datetime
 import subprocess
 import requests
+from copy import deepcopy
 from scipy.sparse import csr_matrix
 
 class StringUtils:
@@ -109,12 +110,97 @@ class FileUtils:
         if os.path.isfile(filepath):
             return not os.path.basename(filepath).startswith('.')
         
+    def deleteFile(filepath):
+        """Deletes a file."""
+        try:
+            os.remove(filepath)
+        except:
+            pass
+        
     def deleteFolder(folder):
         """Deletes a folder and all its contents."""
         try:
             shutil.rmtree(folder)
         except:
             pass
+
+    def archiveFile(file, archive_folder):
+        # Rename the file to append the time of update after an underscore, retaining the extension
+        new_name = os.path.basename(file).split(".")[0] + "_" + datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S") + "." + os.path.basename(file).split(".")[1]
+        # Copy to archive folder
+        archive_path = os.path.join(archive_folder, new_name)
+        shutil.copy(file, archive_path)
+        return archive_path
+
+        
+
+
+
+class JSONUtils:
+    def getKeyName(key):
+        """
+        Given a key, returns the key name that should be used for deep checking.
+        This is needed because of semantics.
+        For datasets, singular is "dataset" and plural is "datasets";
+        But for everything else, singular is the same as plural (e.g. sing. "counts" = plur. "counts")
+        """
+        if key == "datasets": return "dataset"
+        else: return key
+
+    def fixJSON(data, ref_dict, overall_ref):
+        """
+        Helper function for fixJSONProject that recursively fixes a JSON file by adding missing keys from a reference JSON file.
+        """
+        for key in ref_dict:
+            if key not in data:
+                data[key] = ref_dict[key]
+            elif type(ref_dict[key]) == dict:
+                JSONUtils.fixJSON(data[key], ref_dict[key], overall_ref)
+            elif type(ref_dict[key]) == list:
+                assert key in data and type(data[key]) == list
+                for dict_obj in data[key]:
+                    key_name = JSONUtils.getKeyName(key)
+                    JSONUtils.fixJSON(dict_obj, overall_ref[key_name], overall_ref)
+                
+
+    def fixJSONProject(filepath, reference, archive_folder):
+        """
+        Fixes a JSON file by adding missing keys from a reference JSON file for project files.
+        Deep checks keys that have "attr" or "settings" as part of their key.
+        """
+        archive = FileUtils.archiveFile(filepath, archive_folder)
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        with open(reference, 'r') as f:
+            ref = json.load(f)
+        orig_data = deepcopy(data)
+        JSONUtils.fixJSON(data, ref["project"], ref)
+        modified = data != orig_data  # Check if the data was modified
+        if modified:
+            # Write the fixed JSON back to the file
+            with open(filepath, 'w') as f:
+                FileUtils.writeJSON(f, data)
+        else:
+            # Delete the archive
+            FileUtils.deleteFile(archive)
+        
+
+
+    def fixJSONPreferences(filepath, reference):
+        """
+        Fixes a JSON file by adding missing keys from a reference JSON file for preferences files.
+        """
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        with open(reference, 'r') as f:
+            ref = json.load(f)
+        for key in ref:
+            if key not in data:
+                data[key] = ref[key]
+                print(f"Added key {key}")
+        
+
+    
 
             
 class MatrixUtils:
@@ -228,7 +314,7 @@ class WebUtils:
 
         
 
-# Test WebUtils
+# Test Fix JSON
 
 if __name__ == "__main__":
-    print(WebUtils.check_internet_connection())
+    JSONUtils.fixJSONProject("TestProject/Test Project Update JSON/Test Project Update JSON.json", "json/expected_format_project.json")

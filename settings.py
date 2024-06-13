@@ -1,5 +1,5 @@
 import os
-from utils import FileUtils, StringUtils
+from utils import FileUtils, StringUtils, JSONUtils
 import json
 import platform
 import datetime
@@ -43,6 +43,12 @@ class Settings:
             return os.path.join(os.getenv('APPDATA'), "PythonCBAS")
         elif platform.system() == "Darwin":
             return os.path.join(os.getenv('HOME'), "Library", "Application Support", "PythonCBAS")
+    
+    def getArchiveFolder():
+        path = os.path.join(Settings.getAppDataFolder(), "Archives")
+        if not os.path.exists(path):
+            os.makedirs(path)
+        return path
         
     def getDocumentsFolder():
         try:
@@ -106,6 +112,9 @@ class Settings:
             'ALLSEQALLANDIR': os.path.join(counts_folder, 'All Seq All An'),
             'SEQCNTSDIR': os.path.join(counts_folder, 'Sequence Counts'),
         }
+    
+    def getJSONReference():
+        return os.path.join("json/expected_json_format.json")
 
 
 
@@ -129,8 +138,12 @@ class Project:
     def __init__(self):
         self.project_attr = {}
         self.datasets = []
+
+    
         
     def readProject(self, filepath):
+        # Fix the JSON File if necessary
+        JSONUtils.fixJSONProject(filepath, Settings.getJSONReference(), Settings.getArchiveFolder())
         with open(filepath, 'r') as f:
             data = FileUtils.readJSON(f)
 
@@ -216,7 +229,7 @@ class DataSet:
             assert dataset["type"] == "dataset"
             counts = dataset["counts"]
         except KeyError:
-            raise KeyError("Error reading in the datasets.")
+            raise KeyError("JSON error reading in the datasets.")
         
         for count in counts:
             counts_obj = Counts()
@@ -299,12 +312,16 @@ class Counts:
     def __init__(self, ):
         self.resamples = []
         self.counts_settings = None
+        self.counts_metadata = None
     
     def readCounts(self, counts):
         try:
+            assert counts["type"] == "counts"
             resamples = counts["resamples"]
+            self.counts_settings = counts["counts_settings"]
+            self.counts_metadata = counts["counts_metadata"]
         except KeyError:
-            raise KeyError("Error reading in the counts.")
+            raise KeyError("JSON error reading in the counts.")
         
         for resample in resamples:
             resample_obj = Resamples()
@@ -312,24 +329,28 @@ class Counts:
             resample_obj.setParent(self)
             self.resamples.append(resample_obj)
 
-        self.counts_settings = counts["counts_settings"]
+        
 
     def exportCounts(self):
         """Generate the dictionary for a counts object."""
         counts = {
             "type": "counts",
             "counts_settings": self.getCountsSettings(),
+            "counts_metadata": self.getCountsMetadata(),
             "resamples": [resample.exportResamples() for resample in self.resamples]
         }
         return counts
 
-    def createCounts(self, name: str, dir, description: str, criterion_dict: dict, counts_language_dict: dict):
+    def createCounts(self, name: str, dir, description: str, criterion_dict: dict, counts_language_dict: dict, time_taken: float):
         self.counts_settings = {
             "name": name,
             "dir": dir,
             "description": description,
             "criterion": criterion_dict,
             "counts_language": counts_language_dict,
+        }
+        self.counts_metadata = {
+            "time_taken": time_taken
         }
     
     def addResamples(self, resample_obj):
@@ -362,6 +383,8 @@ class Counts:
     def getCountsLanguage(self) -> dict: return self.counts_settings["counts_language"]
     def getMaxSequenceLength(self) -> int: return self.getCountsLanguage()["MAX_SEQUENCE_LENGTH"]
     def straddleSessions(self) -> bool: return self.getCountsLanguage()["STRADDLE_SESSIONS"]
+    def getCountsMetadata(self) -> dict: return self.counts_metadata
+    def getCountsTimeTaken(self) -> float: return self.counts_metadata["time_taken"]
     def getChildren(self) -> list: return self.resamples
     def getParent(self) -> DataSet: return self.parent
 
@@ -374,11 +397,19 @@ class Resamples:
     def __init__(self, ):
         self.pvalues = []
         self.resample_settings = None
-        self.pvaluesettings = None  # [PVALUE]
+        self.pvalue_settings = None  # [PVALUE]
+        self.resamples_metadata = None
+        self.pvalues_metadata = None
     
     def readResamples(self, resamples):
-        self.resample_settings = resamples["resample_settings"]
-        self.pvaluesettings = resamples["pvalue_settings"]  # [PVALUE]
+        try:
+            assert resamples["type"] == "resamples"
+            self.resample_settings = resamples["resample_settings"]
+            self.pvalue_settings = resamples["pvalue_settings"]  # [PVALUE]
+            self.resamples_metadata = resamples["resamples_metadata"]
+            self.pvalues_metadata = resamples["pvalues_metadata"]
+        except KeyError:
+            raise KeyError("JSON error reading in the resamples.")
 
     def exportResamples(self):
         """Generate the dictionary for a resamples object."""
@@ -386,11 +417,14 @@ class Resamples:
             "type": "resamples",
             "resample_settings": self.getResampleSettings(),
             "pvalue_settings": self.getPValueSettings(),
+            "resamples_metadata": self.getResamplesMetadata(),
+            "pvalues_metadata": self.getPValuesMetadata(),
         }
         return resamples
     
     def createResamples(self, name: str, description: str, directory, correlational: bool, seed, num_resamples: int, contingencies: list, groups: dict,
-                       fdp: bool, alpha: float, gamma: float):
+                       fdp: bool, alpha: float, gamma: float,
+                       resamples_time_taken: float, pvalues_time_taken: float):
         reformatted_groups = [[int(num) for num in group] for group in groups] if not correlational else None
         self.resample_settings = {
             "name": name,
@@ -402,10 +436,16 @@ class Resamples:
             "contingencies": contingencies,
             "groups": reformatted_groups
         }
-        self.pvaluesettings = {
+        self.pvalue_settings = {
             "fdp": fdp,
             "alpha": alpha,
             "gamma": gamma
+        }
+        self.resamples_metadata = {
+            "time_taken": resamples_time_taken
+        }
+        self.pvalues_metadata = {
+            "time_taken": pvalues_time_taken
         }
     
     # def addPvaluesObj(self, pvalue_obj):
@@ -430,12 +470,17 @@ class Resamples:
     def getNumResamples(self) -> int: return self.resample_settings["numresamples"]
     def getContingencies(self) -> list: return self.resample_settings["contingencies"]
     def getGroups(self) -> dict: return self.resample_settings["groups"]
+    def getResamplesMetadata(self) -> dict: return self.resamples_metadata
+    def getResamplesTimeTaken(self) -> float: return self.resamples_metadata["time_taken"]
     # P-Value Settings are here for now, since we're combining until we can figure out how to separate them
-    def getPValueSettings(self) -> dict: return self.pvaluesettings
-    def useFDP(self) -> bool: return self.pvaluesettings["fdp"]
-    def getAlpha(self) -> float: return self.pvaluesettings["alpha"]
-    def getGamma(self) -> float: return self.pvaluesettings["gamma"]
+    def getPValueSettings(self) -> dict: return self.pvalue_settings
+    def useFDP(self) -> bool: return self.pvalue_settings["fdp"]
+    def getAlpha(self) -> float: return self.pvalue_settings["alpha"]
+    def getGamma(self) -> float: return self.pvalue_settings["gamma"]
+    def getPValuesMetadata(self) -> dict: return self.pvalues_metadata
+    def getPValuesTimeTaken(self) -> float: return self.pvalues_metadata["time_taken"]
     # End of P-Value Settings
+
     def getChildren(self) -> list: return self.pvalues
     def getParent(self) -> Counts: return self.parent
 
@@ -449,19 +494,38 @@ class Visualizations:
     
     def readVisualizations(self, visualizations):
         try:
-            self.pvalueid = visualizations["pvalueid"]
-            self.visualizationid = visualizations["visualizationid"]
+            assert visualizations["type"] == "visualizations"
+            self.visualization_settings = visualizations["visualization_settings"]
         except KeyError:
-            raise KeyError("Error reading in the visualizations.")
+            raise KeyError("JSON error reading in the visualizations.")
         
     def exportVisualizations(self):
         """Generate the dictionary for a visualizations object."""
         visualizations = {
             "type": "visualizations",
-            "pvalueid": self.getPvalueID(),
-            "visualizationid": self.getVisualizationID()
+            "pvalueid": self.getVisualizationSettings(),
         }
         return visualizations
+    
+    def createVisualizations(self):
+        pass
+
+    def writeProject(self):
+        self.getParent().writeProject()
+
+    def retracePath(self):
+        return self.getParent().retracePath() + [self]
+    
+    ### GETTER FUNCTIONS ###
+    def getType(self) -> str: return "visualizations"
+    def getCardInfo(self): return None
+    def getVisualizationSettings(self) -> dict: return self.visualization_settings
+    def getChildren(self) -> list: return []
+    def getParent(self) -> Resamples: return self.parent
+
+    ### SETTER FUNCTIONS ###
+    def setParent(self, parent:Resamples): self.parent = parent
+
     
 
 

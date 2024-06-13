@@ -147,7 +147,6 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         window = QMainWindow(parent=self)
         viewer = FileViewer(directory)
         window.setCentralWidget(viewer)
-        print(type(self.obj))
         window.setWindowTitle(f"FileViewer: {self.obj.getName()} [{StringUtils.capitalizeFirstLetter(self.obj.getType())}]")
         # Set size
         window.resize(1500, 860)

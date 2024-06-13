@@ -77,7 +77,8 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
 
         # Timer setup
         self.timer = QTimer()
-        self.startTime = None
+        self.start_time = None
+        self.time_taken = None
         self.timer.timeout.connect(self.updateTimeElapsed)
         # self.timer.timeout.connect(self.updateEstimatedTimeLeft)
         self.timer.start(1000)  # Update every second
@@ -96,7 +97,7 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         Reset the progress bar and start the timer.
         """
         self.progressBar.setValue(0)
-        self.startTime = time.time()  # Record the start time
+        self.start_time = time.time()  # Record the start time
 
     def updateProgress(self, progress: tuple):
         """
@@ -118,8 +119,8 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         self.progressLabel.setText(progress_label)
 
     def updateTimeElapsed(self):
-        if self.startTime is not None:
-            elapsed_time = time.time() - self.startTime
+        if self.start_time is not None:
+            elapsed_time = time.time() - self.start_time
             self.timeElapsed.setText(f"Time elapsed: {TimeUtils.format_time(elapsed_time)}")
 
     def updateEstimatedTimeLeft(self):
@@ -145,13 +146,14 @@ class ProgressDialog(QDialog, Ui_ProgressDialog):
         """
         self.timer.stop()  # Stop the timer when the operation is finished
         self.returnValue = return_value
+        self.time_taken = time.time() - self.start_time
         self.close()
 
     def run(self):
         """Run the dialog and return the return value from the worker thread."""
         self.running_thread.start()
         self.exec()
-        return self.returnValue
+        return self.returnValue, self.time_taken
 
 
 class GroupSelectorDialog(QDialog, Ui_GroupSelectorDialog):
@@ -328,9 +330,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                        inf_criterion, 
                                        counts_language, 
                                        self.parent_obj.getNumAnimals())
-        self.scanned_criterion_matrix = ProgressDialog(f"Scanning Criterion Order {order}", self.parent_obj.getNumAnimals(),
-                                          processor, processor.scanCriterionOrder, processor.getCriterionMatrix,
-                                          processor.start_processing_signal, processor.processing_progress_signal, processor.scan_complete_signal, self).run()
+        self.scanned_criterion_matrix, _ = ProgressDialog(f"Scanning Criterion Order {order}", self.parent_obj.getNumAnimals(),
+                                                            processor, processor.scanCriterionOrder, processor.getCriterionMatrix,
+                                                            processor.start_processing_signal, processor.processing_progress_signal, processor.scan_complete_signal, self).run()
         
         self.visualizeButton.setDisabled(self.scanned_criterion_matrix is None)
 
@@ -399,21 +401,22 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                             processor, processor.runSequenceCounts, processor.getCountsDir,
                                             processor.start_processing_signal, processor.processing_progress_signal, processor.seq_cnts_complete_signal, self)
         progress_dialog.displayPercentage()
-        counts_dir = progress_dialog.run()
-        if counts_dir is not None:
-            self.createCounts(counts_dir, criterion, counts_language)
+        counts_dir, time_taken = progress_dialog.run()
+        if counts_dir is not None and time_taken is not None:
+            self.createCounts(counts_dir, criterion, counts_language, time_taken)
         
         QMessageBox.information(self, "Counts", "Sequence counts have been calculated and saved to the counts directory.")
         
         
-    def createCounts(self, counts_dir, criterion, counts_language):
+    def createCounts(self, counts_dir, criterion, counts_language, time_taken):
         """Create the Counts object and return it."""
         counts = Counts()
         counts.createCounts(self.nameLineEdit.text(),
                             counts_dir,
                             self.descPlainTextEdit.toPlainText(),
                             criterion,
-                            counts_language)
+                            counts_language,
+                            time_taken)
         counts.setParent(self.parent_obj)
         self.returnValue = counts
         self.close()
@@ -556,8 +559,10 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             resampler.setGroups(self.orig_groups, self.all_animals)
             running_process = lambda: resampler.generateResampledMatrix(correlational=False, num_resamples=num_resamples)
         
+        resample_start_time = time.time()
         running_process()
         resampled_matrix = resampler.getResampledMatrix()
+        resample_time_taken = time.time() - resample_start_time
 
         stats_analyzer = StatisticalAnalyzer(resampled_matrix)
         stats_analyzer.setParams(alpha, gamma)
@@ -581,7 +586,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                             stats_analyzer, worker_function, stats_analyzer.getPValueResults,
                                             stats_analyzer.start_signal, stats_analyzer.progress_signal, stats_analyzer.end_signal, self)
         progress_dialog.displayPercentage()
-        p_values, k = progress_dialog.run()
+        p_values, pvalues_time_taken = progress_dialog.run()
         
         counts_dir = self.parent_obj.getDir()
         
@@ -589,13 +594,13 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
 
         self.createResamples(resample_dir, seed, num_resamples, contingencies, 
                              self.orig_groups if not self.useCorrelationalCheckBox.isChecked() else None, 
-                             alpha, gamma)
+                             alpha, gamma, resample_time_taken, pvalues_time_taken)
         
         QMessageBox.information(self, "Resampling", "Resampling and P-Value analysis complete!\nSignificant sequences have been saved to the resample directory.")
     
 
 
-    def createResamples(self, directory, custom_seed, num_resamples, contingencies, groups, alpha, gamma):
+    def createResamples(self, directory, custom_seed, num_resamples, contingencies, groups, alpha, gamma, resample_time_taken, pvalues_time_taken):
         """Create the Resamples object and return it."""
         resamples = Resamples()
         resamples.createResamples(self.nameLineEdit.text(),
@@ -608,7 +613,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                   groups,
                                   self.fdpRadio.isChecked(),
                                   alpha,
-                                  gamma)
+                                  gamma,
+                                  resample_time_taken,
+                                  pvalues_time_taken)
         resamples.setParent(self.parent_obj)
         self.returnValue = resamples
         self.close()
