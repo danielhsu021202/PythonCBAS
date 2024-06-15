@@ -95,8 +95,6 @@ class PandasTableModel(QAbstractTableModel):
         self.layoutChanged.emit()
 
 
-
-
 class PandasTable(QTableView):
     def __init__(self, data, parent=None, view_only=False):
         super().__init__()
@@ -230,9 +228,6 @@ class PandasTable(QTableView):
         self.model = PandasTableModel(self.df)
         self.setModel(self.model)
 
-
-
-        
 
 class FileViewer(QWidget, Ui_FileViewer):
 
@@ -445,7 +440,6 @@ class FileViewer(QWidget, Ui_FileViewer):
 
     def closeFile(self, index):
         """Closes the file at the given index."""
-        print(self.open_files)
         self.open_files.remove(self.fileTabs.widget(index).property("filepath"))
         self.fileTabs.removeTab(index)
         self.actionsBox.setEnabled(len(self.open_files) > 0)

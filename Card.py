@@ -1,5 +1,5 @@
 from PyQt6 import QtCore, QtGui
-from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout, QMenu, QMessageBox
+from PyQt6.QtWidgets import QDialog, QWidget, QApplication, QVBoxLayout, QMenu, QMessageBox, QInputDialog, QMainWindow
 
 from ui.Card_ui import Ui_Card
 from settings import DataSet, Counts, Resamples, next_type
@@ -86,6 +86,7 @@ class Card(QWidget, Ui_Card):
         menu.addSeparator()
 
         # General Actions
+        getinfo_action = menu.addAction("Get Info")
         rename_action = menu.addAction("Rename")
         delete_action = menu.addAction("Delete")
         fileviewer_action = menu.addAction("Open in FileViewer")
@@ -95,17 +96,31 @@ class Card(QWidget, Ui_Card):
         action = menu.exec(QtGui.QCursor.pos())
 
         # Actions
-        if action == rename_action:
-            pass
+        if action == getinfo_action:
+            self.navigator.spawnInfoDisplay(self.obj, None)
+        elif action == rename_action:
+            # Prompt for new name
+            new_name, ok = QInputDialog.getText(self, 'Rename', 'Enter a new name:', text=self.obj.getName())
+            if ok:
+                self.obj.setName(new_name)
+                self.obj.renameDir(new_name)
+                self.commitChanges()
+            
         elif action == delete_action:
             # Prompt for deletion
             reply = QMessageBox.question(self, 'Delete', f"Are you sure you want to delete {self.obj.getName()} and all the files associated with it?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
                 self.obj.getParent().deleteChild(self.obj)
-                self.navigator.getProject().writeProject()
-                self.navigator.populateItems(self.navigator.obj, self.navigator.mode)
+                self.commitChanges()
         elif action == fileviewer_action:
             self.navigator.spawnFileViewer(self.obj.getDir())
+
+    def commitChanges(self):
+        self.navigator.getProject().writeProject()
+        self.navigator.populateItems(self.navigator.obj, self.navigator.mode)
+
+    
+
             
 
 

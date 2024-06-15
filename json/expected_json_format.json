@@ -2,41 +2,44 @@
     "project": {
         "type": "project",
         "project_attr": {
-            "name": "<default_string>",
-            "description": "<default_string>",
-            "datecreated": "<default_string>",
-            "datemodified": "<default_string>",
-            "dir": "<default_string>",
-            "version": "<default_string>"
+            "name": null,
+            "description": null,
+            "datecreated": null,
+            "datemodified": null,
+            "dir": null,
+            "version": null
         },
         "datasets": []
     },
     "dataset": {
         "type": "dataset",
         "dataset_settings": {
-            "name": "<default_string>",
-            "description": "<default_string>",
-            "dir": "<default_string>",
-            "aninfoname": "<default_string>",
-            "anInfoColumnNames": "<default_list>",
-            "anDataColumns": "<default_dict>",
-            "correlational_possible": "<default_bool>",
-            "language": "<default_dict>",
-            "num_animals": "int",
-            "cohort_file": "<default_string>",
-            "all_animals_file": "<default_string>",
-            "all_paths_file": "<default_string>"
+            "name": null,
+            "description": null,
+            "dir": null,
+            "aninfoname": null,
+            "anInfoColumnNames": null,
+            "anDataColumns": null,
+            "correlational_possible": null,
+            "language": null,
+            "num_animals": null,
+            "cohort_file": null,
+            "all_animals_file": null,
+            "all_paths_file": null
+        },
+        "dataset_metadata": {
+            "datecreated": null
         },
         "counts": []
     },
     "counts": {
         "type": "counts",
         "counts_settings": {
-            "name": "<default_string>",
-            "dir": "<default_string>",
-            "description": "<default_string>",
-            "criterion": "<default_dict>",
-            "counts_language": "<default_dict>"
+            "name": null,
+            "dir": null,
+            "description": null,
+            "criterion": null,
+            "counts_language": null
         },
         "counts_metadata": {
             "time_taken": null
@@ -47,25 +50,27 @@
     "resamples": {
         "type": "resamples",
         "resample_settings": {
-            "name": "<default_string>",
-            "description": "<default_string>",
-            "dir": "<default_string>",
-            "correlational": "<default_bool>",
-            "seed": "<default_int>",
-            "numresamples": "<default_int>",
-            "contingencies": "<default_list>",
-            "groups": "<default_list>"
+            "name": null,
+            "description": null,
+            "dir": null,
+            "correlational": null,
+            "seed": null,
+            "numresamples": null,
+            "contingencies": null,
+            "groups": null
         },
         "pvalue_settings": {
-            "fdp": "<default_bool>",
-            "alpha": "<default_float>",
-            "gamma": "<default_float>"
+            "fdp": null,
+            "alpha":null,
+            "gamma": null
         },
         "resamples_metadata": {
-            "time_taken": null
+            "time_taken": null,
+            "datecreated": null
         },
         "pvalues_metadata": {
-            "time_taken": null
+            "time_taken": null,
+            "datecreated": null
         }
 
     },
