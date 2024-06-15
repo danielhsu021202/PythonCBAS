@@ -425,6 +425,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
     
     ### RESAMPLES ###
 
+
     def setupResampleSettings(self):
         """Set up the settings for Resamples."""
         self.SettingsPages.setCurrentIndex(1)
@@ -448,6 +449,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
 
         self.selectGroupsButton.clicked.connect(self.selectGroups)
         self.useAllContingenciesCheck.stateChanged.connect(self.useAllContingenciesToggled)
+        self.resetDefaultsButton.clicked.connect(self.resetDefaults)
 
         if not self.parent_obj.getParent().correlationalPossible():
             self.useCorrelationalCheckBox.setDisabled(True)
@@ -459,6 +461,13 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         self.fwerRadio.toggled.connect(self.errorCorrectionSettingToggled)
 
         self.errorCorrectionSettingToggled()
+
+    def resetDefaults(self):
+        self.kSkipCheckbox.setChecked(True)
+        self.halfMatrixCheckbox.setChecked(True)
+        self.uint32Radio.setChecked(True)
+        self.float32Radio.setChecked(True)
+        self.writeResampledMatrixCheckbox.setChecked(False)
 
     def useAllContingenciesToggled(self):
         if self.useAllContingenciesCheck.isChecked():
@@ -540,8 +549,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         seed = int(self.customSeedLineEdit.text()) if self.customSeedLineEdit.text() != "" else None
 
         resampler = Resampler(self.nameLineEdit.text(), self.parent_obj.getDir(), 
-                              self.parent_obj.getMaxSequenceLength(), conts,
-                              custom_seed=seed)
+                              self.parent_obj.getMaxSequenceLength(), conts, self.writeResampledMatrixCheckbox.isChecked(),
+                              custom_seed=seed, 
+                              float_type=np.float32 if self.float32Radio.isChecked() else np.float64)
         
         running_process = None
         
@@ -564,7 +574,8 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         resampled_matrix = resampler.getResampledMatrix()
         resample_time_taken = time.time() - resample_start_time
 
-        stats_analyzer = StatisticalAnalyzer(resampled_matrix)
+        stats_analyzer = StatisticalAnalyzer(resampled_matrix, self.kSkipCheckbox.isChecked(), self.halfMatrixCheckbox.isChecked(),
+                                                np.uint16 if self.uint16Radio.isChecked() else np.uint32)
         stats_analyzer.setParams(alpha, gamma)
 
 

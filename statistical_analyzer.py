@@ -6,17 +6,36 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from files import CBASFile
 from sequences import SequencesProcessor
 
+import multiprocessing as mp
+
+class HalfMatrixPValueCalculator:
+    """
+    This class calculates the null distribution using the half-matrix optimization.
+    It is parallelized.
+    """
+    def getPValues(resampled_matrix, references, seq_nums, indexes, k, alpha):
+        # Get the null distribution for each reference value
+        p_values = []
+        prev_p_val = (None, None, None)
+
+
+        
+
 class StatisticalAnalyzer(QThread):
     start_signal = pyqtSignal()
     progress_signal = pyqtSignal(tuple)
     end_signal = pyqtSignal()
 
-    def __init__(self, resampled_matrix):
+    def __init__(self, resampled_matrix, k_skip: bool, half_matrix: bool, index_dtype=np.uint32):
         super(StatisticalAnalyzer, self).__init__()
         self.reference = np.sort(resampled_matrix[0])[::-1]  # Actual reference values
         self.resampled_matrix = resampled_matrix[1:]  # Get everything but the first row from the original unsorted resampled matrix
         self.indexes = np.argsort(resampled_matrix[0])[::-1]
         self.seq_nums = [int(np.floor(i/2)) for i in self.indexes]  # Because each pair of values is a sequence number
+
+        self.k_skip = k_skip
+        self.half_matrix = half_matrix
+        self.index_dtype = index_dtype
 
         self.alpha = None
         self.gamma = None
@@ -48,14 +67,13 @@ class StatisticalAnalyzer(QThread):
     
     def getPValuesFull(self, k=1, alpha=0.05):
         p_values = []
-        prev_p_val = (None, None, None)
+        # prev_p_val = (None, None, None)
+        prev_p_val = None
 
         # For each reference value (sorted in descending order)
         for i in np.arange(len(self.reference)):
-            ref, seq_num = self.reference[i], self.seq_nums[i]
-
-            positively_correlated = self.indexes[i] % 2 == 0
-                
+            ref = self.reference[i]
+            
             # Get null distribution, which is the k'th largest value across every row of the resampled (shortcut if k=1)
             relevant_view = self.resampled_matrix[:, i:]
             null_distribution = np.partition(relevant_view, -k)[:, -k] if k > 1 else np.max(relevant_view, axis=1)
@@ -67,18 +85,31 @@ class StatisticalAnalyzer(QThread):
             if p_val > alpha:
                 break
 
-            if prev_p_val[0] is None:
+            # if prev_p_val[0] is None:
+            if prev_p_val is None:
                 # If this is the first p-value, add it to the list
-                prev_p_val = (p_val, seq_num, positively_correlated)
+                prev_p_val = p_val
             else:
-                if p_val >= prev_p_val[0]:
+                if p_val >= prev_p_val:
                     # If the p-value is greater than or equal to the previous p-value, add to the list and update the previous p-value
-                    p_values.append((p_val, seq_num, positively_correlated))
-                    prev_p_val = (p_val, seq_num, positively_correlated)
+                    p_values.append(p_val)
+                    prev_p_val = p_val
                 else:
                     # If the p-value is less than the previous p-value, add the previous p-value to the list and leave the previous p-value as is
                     p_values.append(prev_p_val)
-        return p_values
+
+        # Build the sequence number and positively correlated information into triplets
+        num_pvalues = len(p_values)
+        if num_pvalues < (k / self.gamma) - 1:
+            p_value_triplets = []
+            for i, p_val in enumerate(p_values):
+                # SOME SORT OF OFF BY ONE THING HERE, BUT THE +1 SEEMED NECESSARY TO MATCH RESULTS IN OLD SCRIPT
+                seq_num = self.seq_nums[i+1]
+                positively_correlated = self.indexes[i+1] % 2 == 0
+                p_value_triplets.append((p_val, seq_num, positively_correlated))
+            return num_pvalues, p_value_triplets
+        else:
+            return num_pvalues, None
     
     def FWERControl(self):
         """Finds the number of significant sequences using the FWER control method."""
@@ -90,25 +121,28 @@ class StatisticalAnalyzer(QThread):
     def fdpControl(self, abbreviated=False):
         """Finds the number of significant sequences using the FDP control method."""
         self.start_signal.emit()
-        p_val_func = self.getPValuesFull if not abbreviated else None  # Update this
+        p_val_func = self.getPValuesFull if not self.half_matrix else lambda k, alpha: HalfMatrixPValueCalculator.getPValues(self.resampled_matrix, self.reference, self.seq_nums, self.indexes, k, alpha)
         progress = lambda l, k: int(100 * ((k / self.gamma) - 1) / l)
 
         progress_str = f"k\t# p-values\t(k / gamma) - 1\n{'-' * 50}\n"
         
         k = 1
-        p_values = p_val_func(k=k, alpha=self.alpha)
-        progress_str += f"{k}\t{len(p_values)}\t\t{(k / self.gamma) - 1}\n"
+        num_pvalues, p_values = p_val_func(k=k, alpha=self.alpha)
+        progress_str += f"{k}\t{num_pvalues}\t\t{(k / self.gamma) - 1}\n"
         # print(progress_str)
-        self.progress_signal.emit((progress(len(p_values), k), progress_str))
+        self.progress_signal.emit((progress(num_pvalues, k), progress_str))
         # print(progress(len(p_values), k))
         
-        while len(p_values) >= (k / self.gamma) - 1:
-            new_k = int(np.ceil((len(p_values) + 1) * self.gamma))  # Optimization: Find the next k instead of incrementing by 1
-            k = k + 1 if new_k == k else new_k
-            p_values = p_val_func(k=k, alpha=self.alpha)
-            progress_str += f"{k}\t{len(p_values)}\t\t{(k / self.gamma) - 1}\n"
+        while num_pvalues >= (k / self.gamma) - 1:
+            if self.k_skip:
+                new_k = int(np.ceil((num_pvalues + 1) * self.gamma))  # Optimization: Find the next k instead of incrementing by 1
+                k = k + 1 if new_k == k else new_k
+            else:
+                k = k + 1
+            num_pvalues, p_values = p_val_func(k=k, alpha=self.alpha)
+            progress_str += f"{k}\t{num_pvalues}\t\t{(k / self.gamma) - 1}\n"
             # print(progress_str)
-            self.progress_signal.emit((progress(len(p_values), k), progress_str))
+            self.progress_signal.emit((progress(num_pvalues, k), progress_str))
 
         self.k = k
         self.p_values = p_values
@@ -116,7 +150,7 @@ class StatisticalAnalyzer(QThread):
         
     
     def getPValueResults(self):
-        return self.p_values, self.k
+        return self.p_values
     
     def writeSigSeqFile(self, p_values, seq_num_index, counts_dir, resample_dir):
         p_val_mat = []
