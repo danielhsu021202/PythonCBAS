@@ -8,6 +8,7 @@ from settings import Settings, CONSTANTS
 from utils import FileUtils
 
 from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtWidgets import QMessageBox
 
 
 
@@ -464,10 +465,15 @@ class SequencesProcessor(QThread):
         """
         Runs the sequence counts for all animals.
         """
-        self.processAllAnimals()
-        self.generateSequenceFiles()
-        self.buildSeqNumIndex
+        try:
+            self.processAllAnimals()
+            self.generateSequenceFiles()
+            self.buildSeqNumIndex
+        except Exception as e:
+            QMessageBox.critical(self, "Error during Sequence Counts Running", f"An error occurred while getting sequence counts:\n{str(e)}")
+            FileUtils.deleteFolder(self.counts_dir)
         self.seq_cnts_complete_signal.emit()
+
 
 
     def generateSequenceFiles(self):
@@ -582,6 +588,7 @@ class SequencesProcessor(QThread):
                 all_seq_cnts[length][cont] = self.sequence_matrix[length][cont].getSeqCounts()
         # self.buildSeqNumIndex(all_seq_cnts, conts)
         return all_seq_cnts
+    
 
 
     

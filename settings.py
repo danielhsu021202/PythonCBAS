@@ -8,8 +8,6 @@ next_type = {
     "project": "dataset",
     "dataset": "counts",
     "counts": "resamples",
-    # "resamples": "pvalues",
-    # "pvalues": "visualizations",
     "resamples": "visualizations",
     "visualizations": None
 }
@@ -19,8 +17,6 @@ prev_type = {
     "dataset": "project",
     "counts": "dataset",
     "resamples": "counts",
-    # "pvalues": "resamples",
-    # "visualizations": "pvalues"
     "visualizations": "resamples"
 }
 
@@ -28,6 +24,8 @@ CONSTANTS = {
     "NaN": -1,
     "inf": -2,
 }
+
+RESERVED_NAMES = {"data", "All Seq", "All Seq All An", "Sequence Counts"}
 
 
 class Settings:
@@ -115,22 +113,6 @@ class Settings:
     
     def getJSONReference():
         return os.path.join("json/expected_json_format.json")
-
-
-
-    
-    def setLanguage(num_choices, modifier_ranges):
-        """Sets the language for the experiment. The language is defined by the number of choices and the number of modifiers."""
-        NUM_CHOICES = num_choices
-        NUM_MODIFIERS = len(modifier_ranges)
-        MODIFIER_RANGES = modifier_ranges
-
-    def setCriterion(self, attr_dict: dict):
-        """Sets the criterion for the experiment. The criterion is defined by the order, number, whether to include failed trials, and whether to allow redemption."""
-        assert attr_dict.keys() == self.criterion.keys()
-        self.criterion = attr_dict
-
-    
 
 
 

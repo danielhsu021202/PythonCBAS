@@ -1,7 +1,7 @@
 from ui.UI_SettingsDialog import Ui_SettingsDialog
 from ui.GroupSelectorDialog import Ui_GroupSelectorDialog
 
-from settings import Settings, Project, DataSet, Counts, Resamples
+from settings import Settings, Project, DataSet, Counts, Resamples, RESERVED_NAMES
 
 from sequences import SequencesProcessor
 from resampler import Resampler
@@ -10,7 +10,7 @@ from visualizations import Visualizer
 
 from ui.ProgressDialog import Ui_ProgressDialog
 
-from utils import TimeUtils
+from utils import TimeUtils, FileUtils
 from files import CBASFile
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QDialog, QWidget, QMessageBox, QHBoxLayout, QComboBox, QLineEdit, QMenu, QListWidgetItem, QTableWidgetItem
@@ -21,7 +21,6 @@ from PyQt6 import QtGui
 import time
 import numpy as np
 import pandas as pd
-import threading
 
 class ProgressDialog(QDialog, Ui_ProgressDialog):
     """
@@ -356,6 +355,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         if self.nameLineEdit.text() == "":
             QMessageBox.critical(self, "Input Error", "Name not filled.")
             return
+        elif self.nameLineEdit.text().lower() in RESERVED_NAMES:
+            QMessageBox.critical(self, "Input Error", f"The name {self.nameLineEdit.text()} is reserved and cannot be used.")
+            return
         else:
             # Prevent duplicate names
             names = [item.getName() for item in self.parent_obj.getChildren()]
@@ -388,6 +390,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         criterion = Settings.buildCriterionDict(order, number, self.criterionIncludeFailedCheck.isChecked(), self.criterionAllowRedemptionCheck.isChecked())
         counts_language = Settings.buildCountsLanguageDict(max_seq_len, bool(self.straddleSessionsCheck.isChecked()))
 
+        # ERROR HANDLING DONE WITHIN sequences.py
         processor = SequencesProcessor(self.nameLineEdit.text(),
                                         self.parent_obj.getDir(),
                                         self.parent_obj.getAnDataColumns(),
@@ -410,16 +413,20 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         
     def createCounts(self, counts_dir, criterion, counts_language, time_taken):
         """Create the Counts object and return it."""
-        counts = Counts()
-        counts.createCounts(self.nameLineEdit.text(),
-                            counts_dir,
-                            self.descPlainTextEdit.toPlainText(),
-                            criterion,
-                            counts_language,
-                            time_taken)
-        counts.setParent(self.parent_obj)
-        self.returnValue = counts
-        self.close()
+        try:
+            counts = Counts()
+            counts.createCounts(self.nameLineEdit.text(),
+                                counts_dir,
+                                self.descPlainTextEdit.toPlainText(),
+                                criterion,
+                                counts_language,
+                                time_taken)
+            counts.setParent(self.parent_obj)
+            self.returnValue = counts
+            self.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Error while Creating Counts Object", f"An error occurred while creating the Counts object: {str(e)}\nThis is likely a bug in the source code (apologies!). Generated files are preserved but may need to be accessed manually.")
+
 
 
     
@@ -519,6 +526,15 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         if self.nameLineEdit.text() == "":
             QMessageBox.critical(self, "Input Error", "Name not filled.")
             return
+        elif self.nameLineEdit.text().lower() in RESERVED_NAMES:
+            QMessageBox.critical(self, "Input Error", f"The name {self.nameLineEdit.text()} is reserved and cannot be used.")
+            return
+        else:
+            # Prevent duplicate names
+            names = [item.getName() for item in self.parent_obj.getChildren()]
+            if self.nameLineEdit.text() in names:
+                QMessageBox.critical(self, "Error", "A Resamples with that name already exists.")
+                return
         if self.numResamplesLineEdit.text() == "":
             QMessageBox.critical(self, "Input Error", "Number of resamples not filled.")
             return
@@ -538,98 +554,114 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             QMessageBox.critical(self, "Input Error", "Gamma must be between 0 and 1.")
             return
         
+        
         QMessageBox.information(self, "Resampling", """Resampling is a computationally intensive process.\nIt is recommended to run this on a machine with multiple cores and a lot of memory.\nThe process may take a long time to complete. Progress indicator has not been implemented, so trust that it's running!\nPress OK to continue.""")
 
-        # Create the Resamples object
-        conts = [int(cont) for cont in self.contingenciesLineEdit.text().split(",")]
-        num_resamples = int(self.numResamplesLineEdit.text())
-        contingencies = [int(cont) for cont in self.contingenciesLineEdit.text().split(",")]
-        alpha = float(self.alphaLineEdit.text())
-        gamma = float(self.gammaLineEdit.text())
-        seed = int(self.customSeedLineEdit.text()) if self.customSeedLineEdit.text() != "" else None
+        try:
+            # Create the Resamples object
+            conts = [int(cont) for cont in self.contingenciesLineEdit.text().split(",")]
+            num_resamples = int(self.numResamplesLineEdit.text())
+            contingencies = [int(cont) for cont in self.contingenciesLineEdit.text().split(",")]
+            alpha = float(self.alphaLineEdit.text())
+            gamma = float(self.gammaLineEdit.text())
+            seed = int(self.customSeedLineEdit.text()) if self.customSeedLineEdit.text() != "" else None
 
-        resampler = Resampler(self.nameLineEdit.text(), self.parent_obj.getDir(), 
-                              self.parent_obj.getMaxSequenceLength(), conts, self.writeResampledMatrixCheckbox.isChecked(),
-                              custom_seed=seed, 
-                              float_type=np.float32 if self.float32Radio.isChecked() else np.float64)
+            resampler = Resampler(self.nameLineEdit.text(), self.parent_obj.getDir(), 
+                                self.parent_obj.getMaxSequenceLength(), conts, self.writeResampledMatrixCheckbox.isChecked(),
+                                self.halfMatrixCheckbox.isChecked(),
+                                custom_seed=seed, 
+                                float_type=np.float32 if self.float32Radio.isChecked() else np.float64)
+            
+            running_process = None
+            
+            if self.useCorrelationalCheckBox.isChecked():
+                animal_matrix_file = self.parent_obj.getParent().getAllAnimalsFile()
+                # animal_matrix = np.loadtxt(animal_matrix_file, delimiter=",", dtype=float)
+                animal_matrix = CBASFile.loadFile(animal_matrix_file).getData()
+                covariate_col = self.parent_obj.getParent().getAnInfoColumnNames().index("Covariate") + 2  # +2 because of the animal number and sequence number columns
+                resampler.setCovariates(animal_matrix[:, covariate_col].astype(float))
+                running_process = lambda: resampler.generateResampledMatrix(correlational=True, num_resamples=num_resamples)
+            else:
+                if len(self.orig_groups[0]) == 0 or len(self.orig_groups[1]) == 0:
+                    QMessageBox.critical(self, "Input Error", "Each group must have at least one animal.")
+                    return
+                resampler.setGroups(self.orig_groups, self.all_animals)
+                running_process = lambda: resampler.generateResampledMatrix(correlational=False, num_resamples=num_resamples)
+        except Exception as e:
+            QMessageBox.critical(self, "Error while Setting Up Resampling", f"An error occurred during Resamples setup: {str(e)}")
+            FileUtils.deleteFolder(resampler.getDir())
+
+        try:
+            resample_start_time = time.time()
+            running_process()
+            reference_rates, resampled_matrix = resampler.getResampledMatrix()
+            resample_time_taken = time.time() - resample_start_time
+        except Exception as e:
+            QMessageBox.critical(self, "Error during Resampling", f"An error occurred during resampling: {str(e)}")
+            FileUtils.deleteFolder(resampler.getDir())
+
+        try:
+            stats_analyzer = StatisticalAnalyzer(reference_rates, resampled_matrix, self.kSkipCheckbox.isChecked(), self.halfMatrixCheckbox.isChecked(),
+                                                    np.uint16 if self.uint16Radio.isChecked() else np.uint32)
+            stats_analyzer.setParams(alpha, gamma)
+            resample_dir = resampler.getDir()
+            seq_num_index = SequencesProcessor.buildSeqNumIndex(resampler.getAllSeqCntsMatrix(), conts, self.parent_obj.getMaxSequenceLength(),
+                                                                resample_dir)
+            worker_function = None
+            if self.fwerRadio.isChecked():
+                # FWER Control only
+                worker_function = stats_analyzer.FWERControl
+            else:
+                # FDP Control
+                worker_function = stats_analyzer.fdpControl
+
+            progress_dialog = ProgressDialog("Calculating p-values", 100,
+                                                stats_analyzer, worker_function, stats_analyzer.getPValueResults,
+                                                stats_analyzer.start_signal, stats_analyzer.progress_signal, stats_analyzer.end_signal, self)
+            progress_dialog.displayPercentage()
+        except Exception as e:
+            QMessageBox.critical(self, "Error while Setting Up P-Value Calculations", f"An error occurred during P-Value Calculations setup: {str(e)}")
+            FileUtils.deleteFolder(resample_dir)
+
+        try:
+            p_values, pvalues_time_taken = progress_dialog.run()
+            counts_dir = self.parent_obj.getDir()
+            stats_analyzer.writeSigSeqFile(p_values, seq_num_index, counts_dir, resample_dir) 
+        except Exception as e:
+            QMessageBox.critical(self, "Error during P-Value Calculation", f"An error occurred while calculating P-Values: {str(e)}")
+            FileUtils.deleteFolder(resample_dir)
         
-        running_process = None
-        
-        if self.useCorrelationalCheckBox.isChecked():
-            animal_matrix_file = self.parent_obj.getParent().getAllAnimalsFile()
-            # animal_matrix = np.loadtxt(animal_matrix_file, delimiter=",", dtype=float)
-            animal_matrix = CBASFile.loadFile(animal_matrix_file).getData()
-            covariate_col = self.parent_obj.getParent().getAnInfoColumnNames().index("Covariate") + 2  # +2 because of the animal number and sequence number columns
-            resampler.setCovariates(animal_matrix[:, covariate_col].astype(float))
-            running_process = lambda: resampler.generateResampledMatrix(correlational=True, num_resamples=num_resamples)
-        else:
-            if len(self.orig_groups[0]) == 0 or len(self.orig_groups[1]) == 0:
-                QMessageBox.critical(self, "Input Error", "Each group must have at least one animal.")
-                return
-            resampler.setGroups(self.orig_groups, self.all_animals)
-            running_process = lambda: resampler.generateResampledMatrix(correlational=False, num_resamples=num_resamples)
-        
-        resample_start_time = time.time()
-        running_process()
-        resampled_matrix = resampler.getResampledMatrix()
-        resample_time_taken = time.time() - resample_start_time
-
-        stats_analyzer = StatisticalAnalyzer(resampled_matrix, self.kSkipCheckbox.isChecked(), self.halfMatrixCheckbox.isChecked(),
-                                                np.uint16 if self.uint16Radio.isChecked() else np.uint32)
-        stats_analyzer.setParams(alpha, gamma)
-
-
-        resample_dir = resampler.getDir()
-
-        seq_num_index = SequencesProcessor.buildSeqNumIndex(resampler.getAllSeqCntsMatrix(), conts, self.parent_obj.getMaxSequenceLength(),
-                                                            resample_dir)
-        
-
-        worker_function = None
-        if self.fwerRadio.isChecked():
-            # FWER Control only
-            worker_function = stats_analyzer.FWERControl
-        else:
-            # FDP Control
-            worker_function = stats_analyzer.fdpControl
-
-        progress_dialog = ProgressDialog("Calculating p-values", 100,
-                                            stats_analyzer, worker_function, stats_analyzer.getPValueResults,
-                                            stats_analyzer.start_signal, stats_analyzer.progress_signal, stats_analyzer.end_signal, self)
-        progress_dialog.displayPercentage()
-        p_values, pvalues_time_taken = progress_dialog.run()
-        
-        counts_dir = self.parent_obj.getDir()
-        
-        stats_analyzer.writeSigSeqFile(p_values, seq_num_index, counts_dir, resample_dir)
-
         self.createResamples(resample_dir, seed, num_resamples, contingencies, 
-                             self.orig_groups if not self.useCorrelationalCheckBox.isChecked() else None, 
-                             alpha, gamma, resample_time_taken, pvalues_time_taken)
-        
+                                self.orig_groups if not self.useCorrelationalCheckBox.isChecked() else None, 
+                                alpha, gamma, resample_time_taken, pvalues_time_taken)
+            
         QMessageBox.information(self, "Resampling", "Resampling and P-Value analysis complete!\nSignificant sequences have been saved to the resample directory.")
     
 
 
     def createResamples(self, directory, custom_seed, num_resamples, contingencies, groups, alpha, gamma, resample_time_taken, pvalues_time_taken):
         """Create the Resamples object and return it."""
-        resamples = Resamples()
-        resamples.createResamples(self.nameLineEdit.text(),
-                                  self.descPlainTextEdit.toPlainText(),
-                                  directory,
-                                  self.useCorrelationalCheckBox.isChecked(),
-                                  custom_seed,
-                                  num_resamples,
-                                  contingencies,
-                                  groups,
-                                  self.fdpRadio.isChecked(),
-                                  alpha,
-                                  gamma,
-                                  resample_time_taken,
-                                  pvalues_time_taken)
-        resamples.setParent(self.parent_obj)
-        self.returnValue = resamples
-        self.close()
+        try:
+            resamples = Resamples()
+            resamples.createResamples(self.nameLineEdit.text(),
+                                    self.descPlainTextEdit.toPlainText(),
+                                    directory,
+                                    self.useCorrelationalCheckBox.isChecked(),
+                                    custom_seed,
+                                    num_resamples,
+                                    contingencies,
+                                    groups,
+                                    self.fdpRadio.isChecked(),
+                                    alpha,
+                                    gamma,
+                                    resample_time_taken,
+                                    pvalues_time_taken)
+            resamples.setParent(self.parent_obj)
+            self.returnValue = resamples
+            self.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Error while Creating Resamples Object", f"An error occurred while creating the Resamples object: {str(e)}\nThis is likely a bug in the source code (apologies!). Generated files are preserved but may need to be accessed manually.")
+
 
     def run(self):
         self.exec()
