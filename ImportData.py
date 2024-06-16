@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QVBoxLayout, QTextEdit, QListWidgetItem, QFileDialog, QTableWidget, QLabel, QTableWidgetItem, QMessageBox, QDialog, QMenu, QPushButton, QLineEdit, QLabel
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QTextEdit, QListWidgetItem, QFileDialog, QTableWidget, QLabel, QTableWidgetItem, QMessageBox, QDialog, QMenu, QPushButton, QLineEdit, QLabel, QInputDialog
 from PyQt6.QtCore import Qt
 
 import os
@@ -7,7 +7,7 @@ import shutil
 import numpy as np
 
 from utils import ListUtils, FileUtils, StringUtils
-from settings import Settings, DataSet
+from settings import Settings, DataSet, RESERVED_NAMES
 
 from ui.ImportDataDialog import Ui_ImportDataDialog
 
@@ -100,8 +100,8 @@ class ColumnSelectTable(QTableWidget):
     def labelColumn(self, column_idx):
         """Label the selected column."""
         # Spawn a simple two button dialog
-        column_label = self.labelColumnDialog(column_idx)
-        if column_label and not column_label.isspace():
+        column_label, ok = QInputDialog.getText(self, f'Label Column {column_idx}', f'Label Column {column_idx}')
+        if ok and column_label and not column_label.isspace():
             if column_label == "Covariate":
                 QMessageBox.warning(self, "Warning", "The label 'Covariate' is reserved for covariates. Please choose another label.")
                 return
@@ -110,35 +110,6 @@ class ColumnSelectTable(QTableWidget):
                 return
             self.setHorizontalHeaderItem(column_idx, QTableWidgetItem(column_label))
             self.columns[column_idx] = column_label
-
-
-    def labelColumnDialog(self, column_idx):
-        """Dialog to input a label for the column."""
-        # Spawn a simple two button dialog
-        dialog = QDialog()
-        dialog.setWindowTitle(f"Label Column {column_idx}")
-        dialog.resize(200, 110)
-        
-        layout = QVBoxLayout()
-
-        label = QLabel(f"Label column {column_idx}:")
-
-        line_edit = QLineEdit()
-        line_edit.setPlaceholderText("Column Label")
-
-        done = QPushButton("Done")
-        done.clicked.connect(lambda: dialog.close())
-        
-        layout.addWidget(label)
-        layout.addWidget(line_edit)
-        layout.addWidget(done)
-        
-        dialog.setLayout(layout)
-        dialog.exec()
-        return str(line_edit.text())
-
-
-
         
 
 class ImportData(QDialog, Ui_ImportDataDialog):
@@ -230,7 +201,10 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         """
         DATA VALIDATION FUNCTION
         """
-        # Check if the name already exists
+        # Ensure the name is not reserved and is not already in use.
+        if self.datasetNameLineEdit.text().lower() in RESERVED_NAMES:
+            QMessageBox.critical(self, "Input Error", f"The name {self.datasetNameLineEdit.text()} is reserved and cannot be used.")
+            return
         names = [item.getName() for item in self.proj_obj.getChildren()]
         if self.datasetNameLineEdit.text() in names:
             QMessageBox.critical(self, "Error", "A dataset with that name already exists.")
@@ -576,7 +550,11 @@ class ImportData(QDialog, Ui_ImportDataDialog):
         # self.anDataColumns = {label: i for i, label in self.anDataTable.columns.items()}
 
         self.hasModifier = "Modifier" in self.anDataColumns
-        self.processFiles()
+        try:
+            self.processFiles()
+        except Exception as e:
+            QMessageBox.critical(self, "Error Processing Files", f"An error occurred during file processing: {str(e)}")
+            FileUtils.deleteFolder(self.dataset_dir)
         self.createDataset()
 
     def processFiles(self):
