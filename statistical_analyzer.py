@@ -7,6 +7,70 @@ from files import CBASFile
 from sequences import SequencesProcessor
 
 import multiprocessing as mp
+
+class ParallelPValueEngine:
+    
+    def getPValues(reference, resampled_matrix, alpha: float, gamma: float, k: int, half_matrix: bool, index_dtype):
+        p_values = []
+        prev_p_value = None
+
+
+
+        # Sort and get indices
+        pool = mp.Pool(mp.cpu_count())
+
+        sorted_indicies = np.empty(resampled_matrix.shape, dtype=index_dtype)
+        results = pool.starmap(ParallelPValueEngine.sortRow, [(row, i) for i, row in enumerate(resampled_matrix)])
+        for i, row, indices in results:
+            sorted_indicies[i] = indices
+            resampled_matrix[i] = row
+        pool.close()
+        pool.join()
+
+        deleted = []  # Each row represents a deleted "column" in the matrix
+
+        for i in np.arange(len(reference)):
+            ref = reference[i]
+            null_distribution = resampled_matrix[:, k]
+
+
+            
+
+    def sortRow(row, i):
+        sorted_row = np.sort(row)
+        indices = np.argsort(row)
+        return (i, sorted_row, indices)
+
+
+    def getPValue(relevant_view, ref, n):
+        """
+        Parallelized; Get the null distirbution, which is the n'th largest of each row, with the relevant matrix being ith column onwards.
+        This one parallelizes only the sorting of the relevant view.
+        Seems to be slower than the other method, at least for small matrices.
+        """
+
+        pool = mp.Pool(mp.cpu_count())
+        null_distribution = pool.starmap(ParallelPValueEngine.nth_largest_geq_ref, [(row, ref, n, i) for i, row in enumerate(relevant_view)])
+        pool.close()
+        pool.join()
+
+        return (np.count_nonzero(null_distribution) + 1) / (len(null_distribution) + 1)
+
+    def nth_largest_geq_ref(arr, ref, n, i) -> bool:
+        """
+        Returns the n'th largest element in the array.
+        """
+        print(i)
+        list(arr).sort()
+        return arr[-n] >= ref
+
+
+    
+
+
+    
+
+    
         
 
 class StatisticalAnalyzer(QThread):
@@ -14,7 +78,7 @@ class StatisticalAnalyzer(QThread):
     progress_signal = pyqtSignal(tuple)
     end_signal = pyqtSignal()
 
-    def __init__(self, reference_rates, resampled_matrix, k_skip: bool, half_matrix: bool, index_dtype=np.uint32):
+    def __init__(self, reference_rates, resampled_matrix, k_skip: bool, half_matrix: bool, parallelize_sort: bool, index_dtype=np.uint32):
         super(StatisticalAnalyzer, self).__init__()
         # self.reference = np.sort(resampled_matrix[0])[::-1]  # Actual reference values
         self.reference = np.sort(reference_rates)[::-1]  # Actual reference values
@@ -25,6 +89,7 @@ class StatisticalAnalyzer(QThread):
 
         self.k_skip = k_skip
         self.half_matrix = half_matrix
+        self.parallelize_sort = parallelize_sort
         self.index_dtype = index_dtype
 
         self.alpha = None
@@ -63,15 +128,20 @@ class StatisticalAnalyzer(QThread):
         for i in np.arange(len(self.reference)):
             ref = self.reference[i]
             
-            #TODO: Take advantage of the pre-sortedness of the array
+            
             #PROBLEM: With sorting, we're no longer deleting the correct entries... we're always deleting the largest, which is incorrect
-
-            # Get null distribution, which is the k'th largest value across every row of the resampled (shortcut if k=1)
+            p_val = None
             relevant_view = self.resampled_matrix[:, (int(np.floor(i/2)) if self.half_matrix else i):]  # If using half the matrix, we only "delete" the first column every other iteration.
-            null_distribution = np.partition(relevant_view, -k)[:, -k] if k > 1 else np.max(relevant_view, axis=1)
-
-            # The p-value is the proportion of null values that are greater than or equal to the reference value
-            p_val = (np.sum(null_distribution >= ref) + 1) / (len(null_distribution) + 1)
+            if not self.parallelize_sort or k == 1:
+                # Get null distribution, which is the k'th largest value across every row of the resampled (shortcut if k=1)
+                null_distribution = np.partition(relevant_view, -k)[:, -k] if k > 1 else np.max(relevant_view, axis=1)
+                # The p-value is the proportion of null values that are greater than or equal to the reference value
+                p_val = (np.sum(null_distribution >= ref) + 1) / (len(null_distribution) + 1)
+            else:
+                p_val = ParallelPValueEngine.getPValue(relevant_view, ref, k)
+                
+                
+                
 
             # We're done if the p-value is greater than or equal to the threshold   
             if p_val > alpha:

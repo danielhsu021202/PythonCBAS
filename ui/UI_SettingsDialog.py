@@ -307,6 +307,9 @@ class Ui_SettingsDialog(object):
         self.kPercentageCheckbox.setEnabled(False)
         self.kPercentageCheckbox.setObjectName("kPercentageCheckbox")
         self.gridLayout.addWidget(self.kPercentageCheckbox, 1, 0, 1, 1)
+        self.parallelizeFDPCheckbox = QtWidgets.QCheckBox(parent=self.groupBox_5)
+        self.parallelizeFDPCheckbox.setObjectName("parallelizeFDPCheckbox")
+        self.gridLayout.addWidget(self.parallelizeFDPCheckbox, 1, 1, 1, 1)
         self.verticalLayout_11.addWidget(self.groupBox_5)
         self.groupBox_6 = QtWidgets.QGroupBox(parent=self.AdvancedSettingsPage)
         self.groupBox_6.setObjectName("groupBox_6")
@@ -379,7 +382,7 @@ class Ui_SettingsDialog(object):
 
         self.retranslateUi(SettingsDialog)
         self.SettingsPages.setCurrentIndex(1)
-        self.resampleTabs.setCurrentIndex(0)
+        self.resampleTabs.setCurrentIndex(1)
         self.useCorrelationalCheckBox.clicked['bool'].connect(self.groupSelectorBox.setHidden) # type: ignore
         self.useAllContingenciesCheck.toggled['bool'].connect(self.contingenciesLineEdit.setDisabled) # type: ignore
         self.useAllContingenciesCheck.toggled['bool'].connect(self.contingenciesLineEdit.clear) # type: ignore
@@ -446,6 +449,7 @@ class Ui_SettingsDialog(object):
         self.kSkipCheckbox.setText(_translate("SettingsDialog", "k-Skipping Optimziation"))
         self.halfMatrixCheckbox.setText(_translate("SettingsDialog", "Half-Matrix Oprimization"))
         self.kPercentageCheckbox.setText(_translate("SettingsDialog", "k-Percentage Heuristic"))
+        self.parallelizeFDPCheckbox.setText(_translate("SettingsDialog", "Parallelized Sort"))
         self.groupBox_6.setTitle(_translate("SettingsDialog", "Data Types"))
         self.label_12.setText(_translate("SettingsDialog", "Precision for Storing Comparisons:"))
         self.float32Radio.setText(_translate("SettingsDialog", "float32"))

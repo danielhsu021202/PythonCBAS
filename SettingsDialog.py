@@ -556,7 +556,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         
         
         QMessageBox.information(self, "Resampling", """Resampling is a computationally intensive process.\nIt is recommended to run this on a machine with multiple cores and a lot of memory.\nThe process may take a long time to complete. Progress indicator has not been implemented, so trust that it's running!\nPress OK to continue.""")
-
+        start_time = time.time()
         try:
             # Create the Resamples object
             conts = [int(cont) for cont in self.contingenciesLineEdit.text().split(",")]
@@ -601,8 +601,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             FileUtils.deleteFolder(resampler.getDir())
 
         try:
-            stats_analyzer = StatisticalAnalyzer(reference_rates, resampled_matrix, self.kSkipCheckbox.isChecked(), self.halfMatrixCheckbox.isChecked(),
-                                                    np.uint16 if self.uint16Radio.isChecked() else np.uint32)
+            stats_analyzer = StatisticalAnalyzer(reference_rates, resampled_matrix, 
+                                                 self.kSkipCheckbox.isChecked(), self.halfMatrixCheckbox.isChecked(), self.parallelizeFDPCheckbox.isChecked(),
+                                                 np.uint16 if self.uint16Radio.isChecked() else np.uint32)
             stats_analyzer.setParams(alpha, gamma)
             resample_dir = resampler.getDir()
             seq_num_index = SequencesProcessor.buildSeqNumIndex(resampler.getAllSeqCntsMatrix(), conts, self.parent_obj.getMaxSequenceLength(),
@@ -629,7 +630,9 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
             stats_analyzer.writeSigSeqFile(p_values, seq_num_index, counts_dir, resample_dir) 
         except Exception as e:
             QMessageBox.critical(self, "Error during P-Value Calculation", f"An error occurred while calculating P-Values: {str(e)}")
-            FileUtils.deleteFolder(self.resample)
+            FileUtils.deleteFolder(resample_dir)
+        
+        print(f"Time Taken for Resampling and P-Values: {time.time() - start_time}")
         
         self.createResamples(resample_dir, seed, num_resamples, contingencies, 
                                 self.orig_groups if not self.useCorrelationalCheckBox.isChecked() else None, 

@@ -262,48 +262,6 @@ class Resampler:
             sts_repeated = np.repeat(studentized_test_stats, 2)
             sts_repeated[1::2] *= -1
             return np.array(sts_repeated).astype(self.float_type, casting='same_kind')
-
-
-    # def getStudentizedTestStatsComparison(self, groups: list[np.array], abbrev=False):
-    #     """
-    #     Generates one row of the resampled matrix.
-    #     Calculates the studentized test statistics for each sequence.
-    #     """
-    #     sts = None
-    #     lengths, conts = self.all_seqcnts_matrix.shape
-    #     for cont in np.arange(conts):
-    #         for length in np.arange(lengths):
-    #             seq_cnts = self.all_seqcnts_matrix[length][cont]
-    #             # Always 2 groups
-    #             # Group 1
-    #             seq_cnts_g1 = seq_cnts[groups[0]]
-    #             seq_cnts_g1 = seq_cnts_g1[~(seq_cnts_g1 == self.CONSTANTS['NaN']).any(axis=1)]
-    #             n1 = seq_cnts_g1.shape[0]
-    #             var1 = seq_cnts_g1.var(axis=0)
-    #             mean1 = seq_cnts_g1.mean(axis=0)
-    #             # Group 2
-    #             seq_cnts_g2 = seq_cnts[groups[1]]
-    #             seq_cnts_g2 = seq_cnts_g2[~(seq_cnts_g2 == self.CONSTANTS['NaN']).any(axis=1)]
-    #             n2 = seq_cnts_g2.shape[0]
-    #             var2 = seq_cnts_g2.var(axis=0)
-    #             mean2 = seq_cnts_g2.mean(axis=0)
-    #             # Studentized Test Statistic
-    #             valid_indices = (var1 > 0) & (var2 > 0)  # Only calculate when the standard deviation is defined and both are non-zero
-    #             c1c2 = np.zeros(len(mean1))
-    #             c1c2[valid_indices] = (mean1[valid_indices] - mean2[valid_indices]) / np.sqrt((var1[valid_indices] / n1) + (var2[valid_indices] / n2))
-                
-
-    #             result = np.repeat(c1c2, 2)
-    #             result[1::2] *= -1
-    #             if sts is None:
-    #                 sts = result
-    #             else:
-    #                 sts = np.hstack((sts, result))
-    #     if abbrev:
-    #         paired_result = [(idx, val) for idx, val in enumerate(sts) if val > 0]
-    #         return paired_result
-    #     else:
-    #         return sts
     
     def resampleComparison(self, id=0):
         """Performs one resampling of the groups."""
