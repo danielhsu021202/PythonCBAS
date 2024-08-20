@@ -9,11 +9,59 @@ from sequences import SequencesProcessor
 import multiprocessing as mp
 
 class ParallelPValueEngine:
+    def __init__(self, reference, resampled_matrix, alpha: float, gamma: float, half_matrix: bool, index_dtype):
+        self.reference = reference
+        # self.resampled_matrix = resampled_matrix
+        self.alpha = alpha
+        self.gamma = gamma
+        self.half_matrix = half_matrix
+        self.index_dtype = index_dtype
+
+        self.sorted_resampled_matrix_indices = np.argsort(-resampled_matrix, axis=1)
+        self.sorted_resampled_matrix = np.take_along_axis(resampled_matrix, self.sorted_resampled_matrix_indices, axis=1)
+
+        self.sorted_resampled_matrix_indices = self.sorted_resampled_matrix_indices.flatten()
     
-    def getPValues(reference, resampled_matrix, alpha: float, gamma: float, k: int, half_matrix: bool, index_dtype):
+    def getPValues(self, k=1):
         p_values = []
         prev_p_value = None
 
+        sorted_resampled_matrix_copy = self.sorted_resampled_matrix.tolist()
+        for i in np.arange(len(self.reference)):
+            ref = self.reference[i]
+            # Get null distribution, which is the k'th column of the sorted_resampled_matrix_copy
+            null_distribution = np.array(sorted_resampled_matrix_copy)[:, k-1]
+
+            # The p-value is the proportion of null values that are greater than or equal to the reference value
+            p_val = (np.sum(null_distribution >= ref) + 1) / (len(null_distribution) + 1)
+
+            # We're done if the p-value is greater than or equal to the threshold
+            if p_val > self.alpha:
+                break
+
+            if prev_p_value is None:
+                # If this is the first p-value, add it to the list
+                prev_p_value = p_val
+            else:
+                if p_val >= prev_p_value:
+                    # If the p-value is greater than or equal to the previous p-value, add to the list and update the previous p-value
+                    p_values.append(p_val)
+                    prev_p_value = p_val
+                else:
+                    # If the p-value is less than the previous p-value, add the previous p-value to the list and leave the previous p-value as is
+                    p_values.append(prev_p_value)
+            
+            # Find the index of all the i's in the index matrix. The x'th entry is the index of the item in the x'th row of the sorted matrix we need to delete.
+            indices = np.where(self.sorted_resampled_matrix_indices == i)[0]
+            print(f"Length of indices: {len(indices)}")
+            print(f"Num rows in sorted_resampled_matrix_copy: {len(sorted_resampled_matrix_copy)}")
+            print(f"Num cols in sorted_resampled_matrix_copy: {len(sorted_resampled_matrix_copy[0])}")
+            # Delete the i'th column from the sorted matrix
+            wrap_length = len(sorted_resampled_matrix_copy[0])
+            for i, index in enumerate(indices):
+                sorted_resampled_matrix_copy[i].pop(index % wrap_length)
+
+        return p_values, []
 
 
         # Sort and get indices
@@ -78,15 +126,16 @@ class StatisticalAnalyzer(QThread):
     progress_signal = pyqtSignal(tuple)
     end_signal = pyqtSignal()
 
-    def __init__(self, reference_rates, resampled_matrix, k_skip: bool, half_matrix: bool, parallelize_sort: bool, index_dtype=np.uint32):
+    def __init__(self, reference_rates, sorting_indices, resampled_matrix, k_skip: bool, half_matrix: bool, parallelize_sort: bool, index_dtype=np.uint32):
         super(StatisticalAnalyzer, self).__init__()
-        # self.reference = np.sort(resampled_matrix[0])[::-1]  # Actual reference values
-        self.reference = np.sort(reference_rates)[::-1]  # Actual reference values
-        # self.resampled_matrix = resampled_matrix[1:]  # Get everything but the first row from the original unsorted resampled matrix
+        self.reference = reference_rates
         self.resampled_matrix = resampled_matrix
-        self.indexes = np.argsort(reference_rates)[::-1]
-        self.seq_nums = [int(np.floor(i/2)) for i in self.indexes]  # Because each pair of values is a sequence number
+        self.indexes = sorting_indices
 
+        # If half matrix, it's not duplicated, so each number is the corresponding sequence number
+        self.seq_nums = [i if half_matrix else int(np.floor(i/2)) for i in self.indexes]  # Because each pair of values is a sequence number
+
+        # Settings
         self.k_skip = k_skip
         self.half_matrix = half_matrix
         self.parallelize_sort = parallelize_sort
@@ -95,6 +144,7 @@ class StatisticalAnalyzer(QThread):
         self.alpha = None
         self.gamma = None
 
+        # Initialize
         self.p_values = None
         self.k = None
 
@@ -123,22 +173,37 @@ class StatisticalAnalyzer(QThread):
     def getPValuesFull(self, k=1, alpha=0.05):
         p_values = []
         prev_p_val = None
+        signs = []  # For half matrix, the signs of the rates originally, used to determine correlatedness or g1>g2
 
         # For each reference value (sorted in descending order)
         for i in np.arange(len(self.reference)):
             ref = self.reference[i]
+            signs = []
             
             
             #PROBLEM: With sorting, we're no longer deleting the correct entries... we're always deleting the largest, which is incorrect
             p_val = None
-            relevant_view = self.resampled_matrix[:, (int(np.floor(i/2)) if self.half_matrix else i):]  # If using half the matrix, we only "delete" the first column every other iteration.
-            if not self.parallelize_sort or k == 1:
+            # relevant_view = self.resampled_matrix[:, (int(np.floor(i/2)) if self.half_matrix else i):]  # If using half the matrix, we only "delete" the first column every other iteration.
+            relevant_view = self.resampled_matrix[:, i:]
+
+            null_distribution = []
+            if self.half_matrix:
+                # Take the absolute values of the rows
+                for row in relevant_view:
+                    # Get the kth largest value in the row, key is absolute value
+                    sort_order = np.argsort(np.abs(row))[::-1]
+                    sorted_row = row[sort_order]
+                    # Append the sign of the largest absolute value
+                    signs.append(sorted_row[0] > 0)
+                    # Append the kth largest absolute value
+                    null_distribution.append(abs(sorted_row[k-1]))
+            else:
                 # Get null distribution, which is the k'th largest value across every row of the resampled (shortcut if k=1)
                 null_distribution = np.partition(relevant_view, -k)[:, -k] if k > 1 else np.max(relevant_view, axis=1)
-                # The p-value is the proportion of null values that are greater than or equal to the reference value
-                p_val = (np.sum(null_distribution >= ref) + 1) / (len(null_distribution) + 1)
-            else:
-                p_val = ParallelPValueEngine.getPValue(relevant_view, ref, k)
+
+            # The p-value is the proportion of null values that are greater than or equal to the reference value
+            p_val = (np.sum(null_distribution >= ref) + 1) / (len(null_distribution) + 1)
+            
                 
                 
                 
@@ -158,7 +223,7 @@ class StatisticalAnalyzer(QThread):
                 else:
                     # If the p-value is less than the previous p-value, add the previous p-value to the list and leave the previous p-value as is
                     p_values.append(prev_p_val)
-        return p_values
+        return p_values, signs
 
     
     
@@ -177,8 +242,16 @@ class StatisticalAnalyzer(QThread):
 
         progress_str = f"k\t# p-values\t(k / gamma) - 1\n{'-' * 50}\n"
         
+        parallel_engine = None
+        if self.parallelize_sort:
+            # Initialize the parallel engine
+            parallel_engine = ParallelPValueEngine(self.reference, self.resampled_matrix, self.alpha, self.gamma, self.half_matrix, self.index_dtype)
+
+
         k = 1
-        p_values = p_val_func(k=k, alpha=self.alpha)
+        p_values = []
+        signs = []
+        p_values, signs = p_val_func(k=k, alpha=self.alpha)
         num_pvalues = len(p_values)
         progress_str += f"{k}\t{num_pvalues}\t\t{(k / self.gamma) - 1}\n"
         # print(progress_str)
@@ -191,7 +264,11 @@ class StatisticalAnalyzer(QThread):
                 k = k + 1 if new_k == k else new_k
             else:
                 k = k + 1
-            p_values = p_val_func(k=k, alpha=self.alpha)
+
+            if self.parallelize_sort:
+                p_values, signs = parallel_engine.getPValues(k=k)
+            else:
+                p_values, signs = p_val_func(k=k, alpha=self.alpha)
             num_pvalues = len(p_values)
             progress_str += f"{k}\t{num_pvalues}\t\t{(k / self.gamma) - 1}\n"
             # print(progress_str)
@@ -199,15 +276,22 @@ class StatisticalAnalyzer(QThread):
 
         self.k = k
         self.p_values = p_values
+        self.signs = signs
         self.end_signal.emit()
         
     def buildTriplets(self, p_values):
         # Build the sequence number and positively correlated information into triplets
         p_value_triplets = []
         for i, p_val in enumerate(p_values):
+            seq_num = None
+            positively_correlated = None
             # SOME SORT OF OFF BY ONE THING HERE, BUT THE +1 SEEMED NECESSARY TO MATCH RESULTS IN OLD SCRIPT
-            seq_num = self.seq_nums[i+1]
-            positively_correlated = self.indexes[i+1] % 2 == 0
+            if self.half_matrix:
+                seq_num = self.seq_nums[i+1]
+                positively_correlated = self.signs[i+1]
+            else:
+                seq_num = self.seq_nums[i+1]
+                positively_correlated = self.indexes[i+1] % 2 == 0
             p_value_triplets.append((p_val, seq_num, positively_correlated))
         return p_value_triplets
 

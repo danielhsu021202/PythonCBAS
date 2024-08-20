@@ -594,14 +594,14 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         try:
             resample_start_time = time.time()
             running_process()
-            reference_rates, resampled_matrix = resampler.getResampledMatrix()
+            reference_rates, sorting_indices, resampled_matrix = resampler.getResampledMatrix()
             resample_time_taken = time.time() - resample_start_time
         except Exception as e:
             QMessageBox.critical(self, "Error during Resampling", f"An error occurred during resampling: {str(e)}")
             FileUtils.deleteFolder(resampler.getDir())
 
         try:
-            stats_analyzer = StatisticalAnalyzer(reference_rates, resampled_matrix, 
+            stats_analyzer = StatisticalAnalyzer(reference_rates, sorting_indices, resampled_matrix, 
                                                  self.kSkipCheckbox.isChecked(), self.halfMatrixCheckbox.isChecked(), self.parallelizeFDPCheckbox.isChecked(),
                                                  np.uint16 if self.uint16Radio.isChecked() else np.uint32)
             stats_analyzer.setParams(alpha, gamma)

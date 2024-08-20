@@ -209,14 +209,8 @@ class Resampler:
         valid_indices = (seq_rates_df['Group 1 Var'] > 0) & (seq_rates_df['Group 2 Var'] > 0)  # Only calculate when the standard deviation is defined and both are non-zero
         c1c2 = np.zeros(seq_rates_df.shape[0])  # Number of zeroes equal to the number of sequences
         c1c2[valid_indices] = (seq_rates_df['Group 1 Avg'][valid_indices] - seq_rates_df['Group 2 Avg'][valid_indices]) / np.sqrt((seq_rates_df['Group 1 Var'][valid_indices] / seq_rates_df['Group 1 N'][valid_indices]) + (seq_rates_df['Group 2 Var'][valid_indices] / seq_rates_df['Group 2 N'][valid_indices]))
-        if self.half_matrix and not reference:
-            # Take the absolute value of c1c2
-            return np.abs(np.array(c1c2)).astype(self.float_type, casting='same_kind')
-
-        else:
-            result = np.repeat(c1c2, 2)
-            result[1::2] *= -1
-            return result.astype(self.float_type, casting='same_kind')
+        
+        return self.postProcessStudentizedTestStats(c1c2, reference)
 
     
     def getStudentizedTestStatsCorrelationalPD(self, covariates, reference=False):
@@ -255,13 +249,31 @@ class Resampler:
                     studentized_test_stats = t
                 else:
                     studentized_test_stats = np.hstack((studentized_test_stats, t))
+            
+        return self.postProcessStudentizedTestStats(studentized_test_stats, reference)
         
+    def postProcessStudentizedTestStats(self, studentized_test_stats, reference: bool):
+        if self.half_matrix:
+            # If using half matrix, we don't duplicat
+            if reference:
+                return np.array(studentized_test_stats).astype(self.float_type, casting='same_kind')
+            else:
+                return np.array(studentized_test_stats[self.sorting_indices_reference]).astype(self.float_type, casting='same_kind')
+        else:
+            sts_repeated = np.repeat(studentized_test_stats, 2)
+            sts_repeated[1::2] *= -1
+            # Sort based on the sorting indices of the reference matrix
+            if reference:
+                return np.array(sts_repeated).astype(self.float_type, casting='same_kind')
+            else:
+                return np.array(sts_repeated[self.sorting_indices_reference]).astype(self.float_type, casting='same_kind')
         if self.half_matrix and not reference:
             return np.abs(np.array(studentized_test_stats)).astype(self.float_type, casting='same_kind')
         else:
             sts_repeated = np.repeat(studentized_test_stats, 2)
             sts_repeated[1::2] *= -1
             return np.array(sts_repeated).astype(self.float_type, casting='same_kind')
+
     
     def resampleComparison(self, id=0):
         """Performs one resampling of the groups."""
@@ -292,6 +304,11 @@ class Resampler:
         else:
             self.reference_studentized_test_stats = self.getStudentizedTestStatsComparisonPD(self.orig_groups, reference=True)
 
+        # Sort the reference
+        self.sorting_indices_reference = np.argsort(self.reference_studentized_test_stats)[::-1]
+        self.reference_studentized_test_stats = self.reference_studentized_test_stats[self.sorting_indices_reference]
+        
+
         # self.resample_start_signal.emit()
         # self.resample_progress_signal.emit((0, "Resampling..."))
         # Create a pool of worker processes
@@ -320,30 +337,10 @@ class Resampler:
 
 
     
-    # def generateResampledMatrixComparisonAbbrev(self, num_resamples=10000):
-    #     """
-    #     Gets the studentized test statistics for the original groups, 
-    #     then resamples the groups and calculates the studentized test statistics for each sequence.
-    #     """
-    #     self.resampled_matrix = []
-    #     # First do it for the original groups
-    #     studentized_test_stats = self.getStudentizedTestStatsComparisonPD(self.orig_groups)
-
-    #     # Set the first row of the resampled_matrix
-    #     self.resampled_matrix.append(studentized_test_stats)
-
-    #     # Create a pool of worker processes
-    #     pool = multiprocessing.Pool()
-    #     # Run self.sample() and append the result to resampled_matrix
-    #     self.resampled_matrix.extend(pool.map(self.resample, range(1, num_resamples+1)))
-    #     # Close the pool and wait for all processes to finish
-    #     pool.close()
-    #     pool.join()
-
-    #     return self.resampled_matrix
+    
     
     def getResampledMatrix(self):
-        return self.reference_studentized_test_stats, self.resampled_matrix
+        return self.reference_studentized_test_stats, self.sorting_indices_reference, self.resampled_matrix
 
         
 
@@ -357,7 +354,7 @@ class Resampler:
         
     def writeResampledMatrix(self):
         # Write the reference matrix to a file
-        reference_file = CBASFile('actual_rates', self.reference_studentized_test_stats)
+        reference_file = CBASFile('actual_rates', np.array(self.reference_studentized_test_stats))
         reference_file.saveFile(self.resamples_dir)
         # Write the resampled matrix to a file
         cbas_file = CBASFile('resampled_matrix', self.resampled_matrix)

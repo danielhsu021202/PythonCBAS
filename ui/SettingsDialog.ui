@@ -647,7 +647,7 @@
               <item row="0" column="0">
                <widget class="QCheckBox" name="kSkipCheckbox">
                 <property name="text">
-                 <string>k-Skipping Optimziation</string>
+                 <string>k-Skipping Optimization</string>
                 </property>
                 <property name="checked">
                  <bool>true</bool>
@@ -656,11 +656,14 @@
               </item>
               <item row="0" column="1">
                <widget class="QCheckBox" name="halfMatrixCheckbox">
+                <property name="enabled">
+                 <bool>false</bool>
+                </property>
                 <property name="text">
-                 <string>Half-Matrix Oprimization</string>
+                 <string>Half-Matrix Optimization</string>
                 </property>
                 <property name="checked">
-                 <bool>true</bool>
+                 <bool>false</bool>
                 </property>
                </widget>
               </item>
@@ -676,6 +679,9 @@
               </item>
               <item row="1" column="1">
                <widget class="QCheckBox" name="parallelizeFDPCheckbox">
+                <property name="enabled">
+                 <bool>true</bool>
+                </property>
                 <property name="text">
                  <string>Parallelized Sort</string>
                 </property>

@@ -393,7 +393,7 @@ class FileViewer(QWidget, Ui_FileViewer):
         if filepath.endswith(".txt") or filepath.endswith(".csv"):
             # Check if the file is tabular
             try:
-                df = pd.read_csv(filepath, header=None)
+                df = pd.read_csv(filepath, header=None)  # TODO: Allow for different delimiters
             except:
                 QMessageBox.critical(self, "Opening file", "File is not tabular in nature.")
                 return
