@@ -406,10 +406,7 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
         progress_dialog.displayPercentage()
         counts_dir, time_taken = progress_dialog.run()
         if counts_dir is not None and time_taken is not None:
-            self.createCounts(counts_dir, criterion, counts_language, time_taken)
-        
-        QMessageBox.information(self, "Counts", "Sequence counts have been calculated and saved to the counts directory.")
-        
+            self.createCounts(counts_dir, criterion, counts_language, time_taken)        
         
     def createCounts(self, counts_dir, criterion, counts_language, time_taken):
         """Create the Counts object and return it."""
@@ -638,7 +635,6 @@ class SettingsDialog(QDialog, Ui_SettingsDialog):
                                 self.orig_groups if not self.useCorrelationalCheckBox.isChecked() else None, 
                                 alpha, gamma, resample_time_taken, pvalues_time_taken)
             
-        QMessageBox.information(self, "Resampling", "Resampling and P-Value analysis complete!\nSignificant sequences have been saved to the resample directory.")
     
 
 

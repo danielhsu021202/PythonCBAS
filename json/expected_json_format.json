@@ -28,7 +28,8 @@
             "all_paths_file": null
         },
         "dataset_metadata": {
-            "datecreated": null
+            "datecreated": null,
+            "datemodified": null
         },
         "counts": []
     },
@@ -42,6 +43,8 @@
             "counts_language": null
         },
         "counts_metadata": {
+            "datecreated": null,
+            "datemodified": null,
             "time_taken": null
         },
         "resamples": []
@@ -66,7 +69,8 @@
         },
         "resamples_metadata": {
             "time_taken": null,
-            "datecreated": null
+            "datecreated": null,
+            "datemodified": null
         },
         "pvalues_metadata": {
             "time_taken": null,

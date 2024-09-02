@@ -50,6 +50,14 @@ class StringUtils:
         """Returns the last n characters of a string. Precede with elipsis if n is less than the length of the string."""
         return s if len(s) <= n else "..." + s[-(n - 3):]
     
+    def formatSize(size: int) -> str:
+        """Formats a size in bytes to a human-readable format."""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1000.0:
+                break
+            size /= 1000.0
+        return f"{size:.2f} {unit}"
+    
     
 
 class FileUtils:
@@ -130,6 +138,17 @@ class FileUtils:
             shutil.rmtree(folder)
         except:
             pass
+
+    def sizeOfFolder(folder, comma=False):
+        """Returns the size of a folder in bytes."""
+        if not os.path.exists(folder):
+            return None
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(folder):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                total_size += os.path.getsize(fp)
+        return total_size
 
     def archiveFile(file, archive_folder):
         # Rename the file to append the time of update after an underscore, retaining the extension
@@ -266,6 +285,13 @@ class ListUtils:
         return {k: v for k, v in sorted(ListUtils.countAll(l).items())}
     
 class TimeUtils:
+    formats = {
+        "blunt": "%Y-%m-%d %H:%M:%S",
+        "short": "%Y-%m-%d",
+        "readable": "%A, %B %d, %Y at %I:%M %p",
+        "readable_short": "%b %d, %Y at %I:%M %p"
+    }
+
     def format_time(seconds):
         duration = datetime.timedelta(seconds=seconds)
         if duration < datetime.timedelta(milliseconds=1):
@@ -280,6 +306,15 @@ class TimeUtils:
             return "{:.2f} hours".format(duration.total_seconds() / 3600)
         else:
             return "{:.2f} days".format(duration.total_seconds() / 86400)
+    
+    def getCurrentDatetimeStr():
+        return str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    def reformat(time_str, old_format, new_format):
+        assert old_format in TimeUtils.formats.keys() and new_format in TimeUtils.formats.keys()
+        if time_str is None:
+            return "Unknown"
+        return datetime.datetime.strptime(time_str, TimeUtils.formats[old_format]).strftime(TimeUtils.formats[new_format])
 
 class WebUtils:
     plotly_js_path = os.path.abspath("js/plotly-2.32.0.min.js")

@@ -111,11 +111,13 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         try:
             if dataset is not None:
                 self.obj.addDataset(dataset)
-                self.obj.writeProject()
+                # self.obj.writeProject()
                 self.populateItems(self.obj, "dataset")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred during dataset creation: {str(e)}")
             return
+        
+        QMessageBox.information(self, "Dataset", "Dataset has been imported and saved to the dataset directory.")
 
     def addCounts(self):
         try:
@@ -124,11 +126,14 @@ class Navigator(QWidget, Ui_NavigatorFrame):
             counts = countsSettings.run()
             if counts is not None:
                 self.obj.addCounts(counts)
-                self.obj.writeProject()
+                # self.obj.writeProject()
                 self.populateItems(self.obj, "counts")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred during counts creation: {str(e)}")
             return
+        
+        QMessageBox.information(self, "Counts", "Sequence counts have been calculated and saved to the counts directory.")
+
 
     def addResamples(self):
         try:
@@ -137,11 +142,14 @@ class Navigator(QWidget, Ui_NavigatorFrame):
             resamples = resamplesSettings.run()
             if resamples is not None:
                 self.obj.addResamples(resamples)
-                self.obj.writeProject()
+                # self.obj.writeProject()
                 self.populateItems(self.obj, "resamples")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred during resamples creation: {str(e)}")
             return
+        
+        QMessageBox.information(self, "Resampling", "Resampling and P-Value analysis complete!\nSignificant sequences have been saved to the resample directory.")
+
 
 
     def spawnFileViewer(self, directory):
@@ -161,7 +169,8 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         window = QMainWindow(parent=self)
         infoDisplay = InfoDisplay(obj, filepath)
         window.setCentralWidget(infoDisplay)
-        window.setWindowTitle(f"[Info] {obj.getName()}")
+        window.setWindowTitle(f"[{obj.getType().title()}] {obj.getName()}")
+        window.resize(450, 600)
         
         # Center on screen
         window.move(QApplication.primaryScreen().geometry().center() - self.frameGeometry().center())

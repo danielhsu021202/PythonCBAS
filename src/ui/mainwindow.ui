@@ -59,6 +59,9 @@
      <string>Preferences</string>
     </property>
     <widget class="QMenu" name="menuAppearance">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="title">
       <string>Appearance</string>
      </property>

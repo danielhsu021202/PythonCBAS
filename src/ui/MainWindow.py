@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'ui/mainwindow.ui'
+# Form implementation generated from reading ui file 'mainwindow.ui'
 #
 # Created by: PyQt6 UI code generator 6.6.1
 #
@@ -43,6 +43,7 @@ class Ui_MainWindow(object):
         self.menuPreferences = QtWidgets.QMenu(parent=self.menubar)
         self.menuPreferences.setObjectName("menuPreferences")
         self.menuAppearance = QtWidgets.QMenu(parent=self.menuPreferences)
+        self.menuAppearance.setEnabled(False)
         self.menuAppearance.setObjectName("menuAppearance")
         self.menuTheme = QtWidgets.QMenu(parent=self.menuAppearance)
         self.menuTheme.setObjectName("menuTheme")

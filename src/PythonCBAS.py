@@ -9,6 +9,8 @@ import sys
 
 import datetime
 
+from utils import TimeUtils
+
 from PyQt6.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox, QDialog, QTableWidgetItem, QTableWidget, QMenu
 from PyQt6.QtCore import Qt
 
@@ -31,6 +33,7 @@ class Lobby(QDialog, Ui_Lobby):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("PythonCBAS")
+        self.resize(420, 550)
 
         self.preferences = preferences
         self.setupRecentlyOpened()
@@ -86,7 +89,7 @@ class Lobby(QDialog, Ui_Lobby):
         project = Project()
         datecreated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         project.createProject(self.projectNameField.text(), self.descriptionTextEdit.toPlainText(), 
-                              datecreated, os.path.join(self.projectLocationField.text()), "beta")
+                              os.path.join(self.projectLocationField.text()), "beta")
         project.writeProject()
         self.preferences.addRecentlyOpened(project.getFilepath())
         self.returnValue = project
@@ -138,7 +141,7 @@ class Lobby(QDialog, Ui_Lobby):
             nameitem = QTableWidgetItem(project.getName())
             nameitem.setData(Qt.ItemDataRole.UserRole, filepath)
             self.recentlyOpenedTable.setItem(i, 0, nameitem)
-            dateitem = QTableWidgetItem(project.getProjectDateModified())
+            dateitem = QTableWidgetItem(TimeUtils.reformat(project.getProjectDateModified(), "blunt", "readable_short"))
             dateitem.setData(Qt.ItemDataRole.UserRole, filepath)
             self.recentlyOpenedTable.setItem(i, 1, dateitem)
 
@@ -247,7 +250,7 @@ class Application:
         with open("ui/styles.qss", "r") as f:
             self.qss = f.read()
 
-        qdarktheme.setup_theme("auto", additional_qss=self.qss)
+        qdarktheme.setup_theme("dark", additional_qss=self.qss)
 
     def run(self):
         self.show_lobby()

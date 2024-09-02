@@ -1,5 +1,5 @@
 import os
-from utils import FileUtils, StringUtils, JSONUtils
+from utils import FileUtils, StringUtils, JSONUtils, TimeUtils
 import json
 import platform
 import datetime
@@ -152,11 +152,11 @@ class Project:
     def writeProject(self):
         filename = self.getName() + ".json" #TODO: Change this to .cbasproj extension
         filepath = os.path.join(self.getDir(), filename)
-        self.setDateModified(str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        self.setDateModified(TimeUtils.getCurrentDatetimeStr())
         with open(filepath, 'w') as f:
             json.dump(self.exportProject(), f)
 
-    def createProject(self, name, description, datecreated, dir, version):
+    def createProject(self, name, description, dir, version):
         # Create a folder for the project
         project_dir = os.path.join(dir, name)
         if not os.path.exists(project_dir):
@@ -165,8 +165,8 @@ class Project:
             "type": "project",
             "name": name,
             "description": description,
-            "datecreated": datecreated,
-            "datemodified": datecreated,
+            "datecreated": TimeUtils.getCurrentDatetimeStr(),
+            "datemodified": TimeUtils.getCurrentDatetimeStr(),
             "dir": project_dir,
             "version": version
         }
@@ -174,6 +174,7 @@ class Project:
     def addDataset(self, dataset_obj):
         dataset_obj.setParent(self)
         self.datasets.append(dataset_obj)
+        self.writeProject()
 
     def retracePath(self):
         return [self]
@@ -206,11 +207,14 @@ class DataSet:
         self.parent = None
         self.counts = []
         self.dataset_settings = None
+        self.dataset_metadata = None
 
     def readDataset(self, dataset: dict):
         try:
             assert dataset["type"] == "dataset"
             counts = dataset["counts"]
+            self.dataset_settings = dataset["dataset_settings"]
+            self.dataset_metadata = dataset["dataset_metadata"]
         except KeyError:
             raise KeyError("JSON error reading in the datasets.")
         
@@ -220,13 +224,14 @@ class DataSet:
             counts_obj.setParent(self)
             self.counts.append(counts_obj)
         
-        self.dataset_settings = dataset["dataset_settings"]
+        
 
     def exportDataset(self):
         """Generate the dictionary for a dataset object."""
         dataset = {
             "type": "dataset",
             "dataset_settings": self.getSettings(),
+            "dataset_metadata": self.getMetadata(),
             "counts": [count.exportCounts() for count in self.counts]
         }
         return dataset
@@ -249,13 +254,20 @@ class DataSet:
             "all_animals_file": all_animals_file,
             "all_paths_file": all_paths_file
         }
+        self.dataset_metadata = {
+            "datecreated": TimeUtils.getCurrentDatetimeStr(),
+            "datemodified": TimeUtils.getCurrentDatetimeStr()
+        }
     
     def addCounts(self, counts_obj):
         counts_obj.setParent(self)
         self.counts.append(counts_obj)
+        self.writeProject()
 
     def writeProject(self):
         self.getParent().writeProject()
+        self.updateDateModified()
+        
 
     def retracePath(self):
         return self.getParent().retracePath() + [self]
@@ -263,11 +275,15 @@ class DataSet:
     def deleteChild(self, child):
         self.counts.remove(child)
         FileUtils.deleteFolder(child.getDir())
+        self.writeProject()
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "dataset"
     def getCardInfo(self) -> tuple: return (self.getName(), StringUtils.lastNChars(self.getDir(), 40))
     def getSettings(self) -> dict: return self.dataset_settings
+    def getMetadata(self) -> dict: return self.dataset_metadata
+    def getDateCreated(self) -> str: return self.dataset_metadata["datecreated"]
+    def getDateModified(self) -> str: return self.dataset_metadata["datemodified"]
     def getName(self) -> str: return self.dataset_settings["name"]
     def getDescription(self) -> str: return self.dataset_settings["description"]
     def getDir(self) -> str: return self.dataset_settings["dir"]
@@ -290,6 +306,7 @@ class DataSet:
     def setParent(self, parent): self.parent = parent
     def setName(self, name): self.dataset_settings["name"] = name
     def renameDir(self, name): pass # TODO: Implement deep renaming
+    def updateDateModified(self): self.dataset_metadata["datemodified"] = TimeUtils.getCurrentDatetimeStr()
 
     
         
@@ -338,28 +355,37 @@ class Counts:
         }
         self.counts_metadata = {
             "time_taken": time_taken,
-            "date_created": str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            "datecreated": TimeUtils.getCurrentDatetimeStr(),
+            "datemodified": TimeUtils.getCurrentDatetimeStr()
         }
     
     def addResamples(self, resample_obj):
         resample_obj.setParent(self)
         self.resamples.append(resample_obj)
+        self.writeProject()
 
     def retracePath(self):
         return self.getParent().retracePath() + [self]
     
+    def writeProject(self):
+        self.getParent().writeProject()
+        self.updateDateModified()
+    
     def deleteChild(self, child):
         self.resamples.remove(child)
         FileUtils.deleteFolder(child.getDir())
+        self.writeProject()
 
-    def writeProject(self):
-        self.getParent().writeProject()
+    
 
 
     ### GETTER FUNCTIONS ###
     def getType(self) -> str: return "counts"
     def getCardInfo(self): return (self.getName(), self.getDescription())
     def getCountsSettings(self) -> dict: return self.counts_settings
+    def getMetadata(self) -> dict: return self.counts_metadata
+    def getDateCreated(self) -> str: return self.counts_metadata["datecreated"]
+    def getDateModified(self) -> str: return self.counts_metadata["datemodified"]
     def getName(self) -> str: return self.counts_settings["name"]
     def getDir(self) -> str: return self.counts_settings["dir"]
     def getDescription(self) -> str: return self.counts_settings["description"]
@@ -373,13 +399,13 @@ class Counts:
     def straddleSessions(self) -> bool: return self.getCountsLanguage()["STRADDLE_SESSIONS"]
     def getCountsMetadata(self) -> dict: return self.counts_metadata
     def getCountsTimeTaken(self) -> float: return self.counts_metadata["time_taken"]
-    def getCountsDateCreated(self) -> str: return self.counts_metadata["date_created"]
     def getChildren(self) -> list: return self.resamples
     def getParent(self) -> DataSet: return self.parent
 
     ### SETTER FUNCTIONS ###
     def setParent(self, parent:DataSet): self.parent = parent
     def setName(self, name): self.counts_settings["name"] = name
+    def updateDateModified(self): self.counts_metadata["datemodified"] = TimeUtils.getCurrentDatetimeStr()
 
 
 
@@ -433,11 +459,12 @@ class Resamples:
         }
         self.resamples_metadata = {
             "time_taken": resamples_time_taken,
-            "date_created": str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            "datecreated": TimeUtils.getCurrentDatetimeStr(),
+            "datemodified": TimeUtils.getCurrentDatetimeStr(),
         }
         self.pvalues_metadata = {
             "time_taken": pvalues_time_taken,
-            "date_created": str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            "datecreated": TimeUtils.getCurrentDatetimeStr(),
         }
     
     # def addPvaluesObj(self, pvalue_obj):
@@ -446,6 +473,7 @@ class Resamples:
 
     def writeProject(self):
         self.getParent().writeProject()
+        self.updateDateModified()
 
     def retracePath(self):
         return self.getParent().retracePath() + [self]
@@ -472,7 +500,7 @@ class Resamples:
     def getGamma(self) -> float: return self.pvalue_settings["gamma"]
     def getPValuesMetadata(self) -> dict: return self.pvalues_metadata
     def getPValuesTimeTaken(self) -> float: return self.pvalues_metadata["time_taken"]
-    def getPValuesDateCreated(self) -> str: return self.pvalues_metadata["date_created"]
+    def getPValuesDateCreated(self) -> str: return self.pvalues_metadata["datecreated"]
     # End of P-Value Settings
     def getChildren(self) -> list: return self.pvalues
     def getParent(self) -> Counts: return self.parent
@@ -480,6 +508,7 @@ class Resamples:
     ### SETTER FUNCTIONS ###
     def setParent(self, parent:Counts): self.parent = parent
     def setName(self, name): self.resample_settings["name"] = name
+    def updateDateModified(self): self.resamples_metadata["datemodified"] = TimeUtils.getCurrentDatetimeStr()
 
 
 class Visualizations:
