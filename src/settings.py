@@ -112,7 +112,7 @@ class Settings:
         }
     
     def getJSONReference():
-        return os.path.join("json/expected_json_format.json")
+        return os.path.join("../json/expected_json_format.json")
 
 
 

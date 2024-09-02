@@ -161,7 +161,7 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         window = QMainWindow(parent=self)
         infoDisplay = InfoDisplay(obj, filepath)
         window.setCentralWidget(infoDisplay)
-        window.setWindowTitle(f"Info: ")
+        window.setWindowTitle(f"[Info] {obj.getName()}")
         
         # Center on screen
         window.move(QApplication.primaryScreen().geometry().center() - self.frameGeometry().center())

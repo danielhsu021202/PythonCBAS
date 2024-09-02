@@ -105,4 +105,4 @@ echo 'Updating dependencies...'
 pip install -r requirements.txt > /dev/null 2>&1
 echo 'Done! Starting PythonCBAS...'
 source pythoncbas_env/bin/activate
-python3.11 PythonCBAS.py
+python3.11 src/PythonCBAS.py

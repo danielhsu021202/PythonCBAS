@@ -29,6 +29,7 @@ class InfoDisplay(QWidget, Ui_InfoDisplay):
         self.setBasicInformation()
 
     def setBasicInformation(self):
+        # Set window title
         self.titleLabel.setText(self.obj.getName())
         self.descriptionTextBrowser.setText(self.obj.getDescription())
         
