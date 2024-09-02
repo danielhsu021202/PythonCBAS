@@ -110,6 +110,13 @@ class FileUtils:
         if os.path.isfile(filepath):
             return not os.path.basename(filepath).startswith('.')
         
+    def renameFolder(folder, new_name):
+        """Renames a folder."""
+        try:
+            os.rename(folder, new_name)
+        except:
+            pass
+        
     def deleteFile(filepath):
         """Deletes a file."""
         try:

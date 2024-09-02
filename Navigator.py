@@ -5,6 +5,8 @@ from ImportData import ImportData
 from SettingsDialog import SettingsDialog
 from settings import Project, DataSet, Counts, Resamples, Visualizations, prev_type
 from FileViewer import FileViewer
+from InfoDisplay import InfoDisplay
+
 
 from utils import StringUtils
 
@@ -150,6 +152,17 @@ class Navigator(QWidget, Ui_NavigatorFrame):
         window.setWindowTitle(f"FileViewer: {self.obj.getName()} [{StringUtils.capitalizeFirstLetter(self.obj.getType())}]")
         # Set size
         window.resize(1500, 860)
+        # Center on screen
+        window.move(QApplication.primaryScreen().geometry().center() - self.frameGeometry().center())
+
+        window.show()
+
+    def spawnInfoDisplay(self, obj, filepath):
+        window = QMainWindow(parent=self)
+        infoDisplay = InfoDisplay(obj, filepath)
+        window.setCentralWidget(infoDisplay)
+        window.setWindowTitle(f"Info: ")
+        
         # Center on screen
         window.move(QApplication.primaryScreen().geometry().center() - self.frameGeometry().center())
 

@@ -197,6 +197,7 @@ class Project:
     def getParent(self) -> None: return None
 
     ### SETTER FUNCTIONS ###
+    def setName(self, name): self.project_attr["name"] = name
     def setDateModified(self, date): self.project_attr["datemodified"] = date
             
 
@@ -268,6 +269,7 @@ class DataSet:
     def getCardInfo(self) -> tuple: return (self.getName(), StringUtils.lastNChars(self.getDir(), 40))
     def getSettings(self) -> dict: return self.dataset_settings
     def getName(self) -> str: return self.dataset_settings["name"]
+    def getDescription(self) -> str: return self.dataset_settings["description"]
     def getDir(self) -> str: return self.dataset_settings["dir"]
     def getAnInfoName(self) -> str: return self.dataset_settings["aninfoname"]
     def getAnInfoColumnNames(self) -> list: return self.dataset_settings["anInfoColumnNames"]
@@ -286,6 +288,9 @@ class DataSet:
 
     ### SETTER FUNCTIONS ###
     def setParent(self, parent): self.parent = parent
+    def setName(self, name): self.dataset_settings["name"] = name
+    def renameDir(self, name): pass # TODO: Implement deep renaming
+
     
         
 
@@ -332,7 +337,8 @@ class Counts:
             "counts_language": counts_language_dict,
         }
         self.counts_metadata = {
-            "time_taken": time_taken
+            "time_taken": time_taken,
+            "date_created": str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         }
     
     def addResamples(self, resample_obj):
@@ -367,11 +373,13 @@ class Counts:
     def straddleSessions(self) -> bool: return self.getCountsLanguage()["STRADDLE_SESSIONS"]
     def getCountsMetadata(self) -> dict: return self.counts_metadata
     def getCountsTimeTaken(self) -> float: return self.counts_metadata["time_taken"]
+    def getCountsDateCreated(self) -> str: return self.counts_metadata["date_created"]
     def getChildren(self) -> list: return self.resamples
     def getParent(self) -> DataSet: return self.parent
 
     ### SETTER FUNCTIONS ###
     def setParent(self, parent:DataSet): self.parent = parent
+    def setName(self, name): self.counts_settings["name"] = name
 
 
 
@@ -424,10 +432,12 @@ class Resamples:
             "gamma": gamma
         }
         self.resamples_metadata = {
-            "time_taken": resamples_time_taken
+            "time_taken": resamples_time_taken,
+            "date_created": str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         }
         self.pvalues_metadata = {
-            "time_taken": pvalues_time_taken
+            "time_taken": pvalues_time_taken,
+            "date_created": str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         }
     
     # def addPvaluesObj(self, pvalue_obj):
@@ -454,6 +464,7 @@ class Resamples:
     def getGroups(self) -> dict: return self.resample_settings["groups"]
     def getResamplesMetadata(self) -> dict: return self.resamples_metadata
     def getResamplesTimeTaken(self) -> float: return self.resamples_metadata["time_taken"]
+    def getResamplesDateCreated(self) -> str: return self.resamples_metadata["date_created"]
     # P-Value Settings are here for now, since we're combining until we can figure out how to separate them
     def getPValueSettings(self) -> dict: return self.pvalue_settings
     def useFDP(self) -> bool: return self.pvalue_settings["fdp"]
@@ -461,13 +472,14 @@ class Resamples:
     def getGamma(self) -> float: return self.pvalue_settings["gamma"]
     def getPValuesMetadata(self) -> dict: return self.pvalues_metadata
     def getPValuesTimeTaken(self) -> float: return self.pvalues_metadata["time_taken"]
+    def getPValuesDateCreated(self) -> str: return self.pvalues_metadata["date_created"]
     # End of P-Value Settings
-
     def getChildren(self) -> list: return self.pvalues
     def getParent(self) -> Counts: return self.parent
 
     ### SETTER FUNCTIONS ###
     def setParent(self, parent:Counts): self.parent = parent
+    def setName(self, name): self.resample_settings["name"] = name
 
 
 class Visualizations:
@@ -507,6 +519,7 @@ class Visualizations:
 
     ### SETTER FUNCTIONS ###
     def setParent(self, parent:Resamples): self.parent = parent
+    def setName(self, name): self.visualization_settings["name"] = name
 
     
 
